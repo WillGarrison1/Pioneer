@@ -1,0 +1,4 @@
+/build/
+/.vscode/
+CMakePresets.json
+/util/__pycache__

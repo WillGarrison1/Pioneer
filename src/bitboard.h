@@ -1,0 +1,118 @@
+#ifndef BITBOARD_H
+#define BITBOARD_H
+
+#include "types.h"
+
+const Bitboard emptyBB = 0ULL;
+const Bitboard fullBB = 0xFFFFFFFFFFFFFFFFULL;
+
+// clang-format off
+const Bitboard rankBBs[] =
+    {
+        0xFFULL,
+        0xFF00ULL,
+        0xFF0000ULL,
+        0xFF000000ULL,
+        0xFF00000000ULL,
+        0xFF0000000000ULL,
+        0xFF000000000000ULL,
+        0xFF00000000000000ULL};
+
+const Bitboard fileBBs[] =
+    {
+        0x0101010101010101ULL,
+        0x0202020202020202ULL,
+        0x0404040404040404ULL,
+        0x0808080808080808ULL,
+        0x1010101010101010ULL,
+        0x2020202020202020ULL,
+        0x4040404040404040ULL,
+        0x8080808080808080ULL};
+
+// Used for finding enemy attacks between castles
+const Bitboard castleBBs[CASTLE_BQ + 1] = {
+    0x0000000000000000ULL,
+    0x0000000000000060ULL, // Short white
+    0x000000000000000CULL, // Long white
+    0x0000000000000000ULL,
+    0x6000000000000000ULL, // Short black
+    0x0000000000000000ULL,
+    0x0000000000000000ULL,
+    0x0000000000000000ULL,
+    0x0C00000000000000ULL, // Long black
+};
+
+// clang-format on
+// Move generation
+
+extern Bitboard knightMoves[64];
+extern Bitboard kingMoves[64];
+extern Bitboard pawnAttacks[9][64];
+extern Bitboard pawnMoves[9][64];
+extern Bitboard bitboardPaths[64][64];
+
+extern const Bitboard (*bitboardRays)[64];
+
+// Evaluation
+
+extern Bitboard passedPawnBB[9][64]; // contains masks for finding passed pawns [side][square]
+extern Bitboard isolatedPawnBB[64];  // contains masks for finding isloated pawns [square]
+
+// Bitboard operations
+
+constexpr Bitboard sqrToBB(const Square sq)
+{
+    return 1ULL << sq;
+}
+
+inline void setBit(Bitboard& bb, const Square sq)
+{
+    bb |= 1ULL << sq;
+}
+
+inline void clearBit(Bitboard& bb, const Square sq)
+{
+    bb &= ~(1ULL << sq);
+}
+
+inline void toggleBit(Bitboard& bb, const Square sq)
+{
+    bb ^= 1ULL << sq;
+}
+
+inline bool getBit(const Bitboard bb, const Square sq)
+{
+    return bb & (1ULL << sq);
+}
+
+inline Square lsb(const Bitboard bb)
+{
+    return static_cast<Square>(__builtin_ctzll(bb));
+}
+
+inline Square msb(const Bitboard bb)
+{
+    return static_cast<Square>(__builtin_clzll(bb));
+}
+
+inline Square popLSB(Bitboard& bb)
+{
+    Square bit = lsb(bb);
+    bb &= bb - 1;
+    return bit;
+}
+
+inline int popCount(const Bitboard bb)
+{
+    return __builtin_popcountll(bb);
+}
+
+constexpr Bitboard operator>>(const Bitboard b, const Direction d)
+{
+    return (static_cast<unsigned long long>(b) >> static_cast<unsigned long long>(d));
+}
+
+extern Bitboard sendRay(Square i, const Direction dir, const Bitboard blockers);
+extern void initBBs();
+
+#endif

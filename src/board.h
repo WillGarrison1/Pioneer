@@ -1,0 +1,169 @@
+#ifndef BOARD_H
+#define BOARD_H
+
+#include <string>
+
+#include "move.h"
+#include "piece.h"
+#include "types.h"
+
+static const std::string START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+
+// Contains all the information about the current state of the board
+struct BoardState
+{
+    Square enPassantSquare;  // En passant square
+    CastlingRights castling; // Castling rights
+    Move move;               // Move that led to this board state
+
+    Bitboard attacks[BLACK + 1];
+    Bitboard checkBB;
+
+    unsigned int numChecks;
+    unsigned int ply; // Ply count
+
+    Score pawn_material;
+    Score non_pawn_material;
+
+    BoardState* previous;
+};
+
+class Board
+{
+  public:
+    Board();
+    ~Board();
+
+    MoveList* generateMoves() const;
+
+    void addPiece(Piece piece, Square square);
+    void removePiece(Square square);
+    void movePiece(Square from, Square to);
+
+    void makeMove(Move move);
+    void undoMove();
+
+    /**
+     * @brief checks if a move causes check
+     *
+     * @param move move to check
+     * @return bool
+     */
+    bool isCheckMove(Move move);
+
+    void print() const;
+
+    void setFen(const std::string& fen);
+    std::string getFen() const;
+
+    // Clears bitboards and board
+    void clear();
+
+    unsigned int generateAttackBB(Bitboard& checkBB, const Color side);
+
+    inline unsigned int generateEnemyAttacks(Bitboard& checkBB)
+    {
+        return state->numChecks = whiteToMove ? generateAttackBB(checkBB, BLACK) : generateAttackBB(checkBB, WHITE);
+    }
+
+    // Move stuff
+    constexpr Move createMove(Square from, Square to, MoveType mType = QUIET, PieceType promote = EMPTY,
+                              CastlingRights castle = NONE_CASTLE) const
+    {
+        return Move(from, to, board[from], board[to], mType, castle, promote);
+    }
+
+    // Get bitboards
+
+    // Get bitboard for piecetypes
+    inline Bitboard getBB(PieceType piece) const
+    {
+        return pieceBB[piece];
+    }
+
+    // Get bitboard for multiple piecetypes
+    template <typename... PieceTypes>
+    inline Bitboard getBB(PieceType piece, PieceTypes... pieces) const
+    {
+        return getBB(piece) | getBB(pieces...);
+    }
+
+    // Get bitboard for color
+    inline Bitboard getBB(Color color) const
+    {
+        return colorBB[color];
+    }
+
+    // Get bitboard for multiple colors
+    template <typename... Colors>
+    inline Bitboard getBB(Color color, Colors... colors) const
+    {
+        return (getBB(color) | getBB(colors...));
+    }
+
+    template <typename... PieceTypes>
+    inline Bitboard getBB(Color color, PieceType piece, PieceTypes... pieces) const
+    {
+        return getBB(color) & getBB(piece, pieces...);
+    }
+
+    // Get piece on square
+    inline Piece getSQ(Square square) const
+    {
+        return board[square];
+    }
+
+    /**
+     * @brief Returns the bitboard of attacked squared by the specified color
+     *
+     * @param c
+     * @return Bitboard
+     */
+    inline Bitboard getAttacked(Color c) const
+    {
+        return state->attacks[c];
+    }
+
+    /**
+     * @brief Get the number of checks on the king
+     *
+     * @return unsigned int
+     */
+    inline unsigned int getNumChecks() const
+    {
+        return state->numChecks;
+    }
+
+    inline Square getEnPassantSqr() const
+    {
+        return state->enPassantSquare;
+    }
+
+    inline BoardState* getState() const
+    {
+        return state;
+    }
+
+    inline Score getPawnMaterial() const
+    {
+        return state->pawn_material;
+    }
+
+    inline Score getNonPawnMaterial() const
+    {
+        return state->non_pawn_material;
+    }
+
+    bool whiteToMove; // True if white is to move
+    Color sideToMove; // Side to move
+
+  private:
+    Bitboard pieceBB[ALL_PIECES + 1]; // Bitboards for each piece type
+    Bitboard colorBB[BLACK + 1];      // Bitboards for each color
+
+    Piece board[64]; // Board representation
+
+    BoardState* state; // Current board state
+};
+
+#endif
