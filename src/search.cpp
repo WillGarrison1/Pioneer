@@ -1,6 +1,6 @@
 #include <cmath>
 #include <iostream>
-#include <memory>
+#include <cstring>
 
 #include "search.h"
 
@@ -96,7 +96,7 @@ Score qsearch(Board& board, int ply, Score alpha, Score beta, PVLine* prevLine)
         {
             pat = score;
             prevLine->moves[0] = m;
-            memcpy(prevLine->moves + 1, &line.moves, line.len * sizeof(Move));
+            std::memcpy(prevLine->moves + 1, &line.moves, line.len * sizeof(Move));
             prevLine->len = line.len + 1;
         }
     }
