@@ -19,7 +19,6 @@ void Interface::run()
     std::string word;
     while (true)
     {
-        std::cout << "PioneerV4.0> ";
         std::getline(std::cin, input);
         std::stringstream parse(input);
 
@@ -95,7 +94,9 @@ void Interface::run()
             }
             else
             {
-                int depth, nodes;
+                int depth = 0;
+                int nodes = 0;
+                int movetime = 0;
                 do
                 {
                     if (word == "depth")
@@ -103,9 +104,19 @@ void Interface::run()
                         parse >> word;
                         depth = atoi(word.c_str());
                     }
+                    else if (word == "movetime")
+                    {
+                        parse >> word;
+                        movetime = atoi(word.c_str());
+                    }
+                    else if (word == "nodes")
+                    {
+                        parse >> word;
+                        nodes = atoi(word.c_str());
+                    }
                 } while (parse >> word);
 
-                engine.go(depth);
+                engine.go(depth, nodes, movetime);
             }
         }
         else if (word == "makemove")

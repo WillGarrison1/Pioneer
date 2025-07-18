@@ -22,7 +22,7 @@ class Engine
         board.setFen(fen);
     }
 
-    void go(unsigned int depth);
+    void go(unsigned int depth, unsigned int nodes, unsigned int movetime);
     void goPerft(unsigned int depth);
 
     void eval();

@@ -79,13 +79,17 @@ class Move
     {
         return m_move;
     }
-    
-    std::string toString();
 
+    std::string toString();
 
   private:
     unsigned int m_move;
 };
+
+constexpr bool operator==(Move m1, Move m2)
+{
+    return m1.getMove() == m2.getMove();
+}
 
 struct MoveList
 {

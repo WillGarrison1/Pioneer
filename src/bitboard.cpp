@@ -11,7 +11,7 @@ Bitboard pawnAttacks[9][64];
 Bitboard pawnMoves[9][64];
 Bitboard bitboardPaths[64][64]; // bitboards with bits from one square to another (note that the start squares/first
                                 // index isn't included)
-Bitboard _bitboardRays[19][64] = {}; // bitboards with bits starting from a certain square heading off the board
+Bitboard _bitboardRays[19][64] = {}; // bitboards with bits starting from a certain square heading off the board (start square isn't included)
 const Bitboard (*bitboardRays)[64] = _bitboardRays + 9;
 
 Bitboard passedPawnBB[9][64];
@@ -92,7 +92,6 @@ void initBBs()
         for (Direction dir = SOUTH_WEST; dir <= NORTH_EAST; dir++)
         {
             Square i = sqr;
-            setBit(_bitboardRays[dir + 9][sqr], i);
             while (distToEdge[dir][i] != 0)
             {
                 i += dir;
@@ -134,12 +133,13 @@ void initBBs()
 
 Bitboard sendRay(Square i, const Direction dir, const Bitboard blockers)
 {
-    Bitboard bb = 0ULL;
 
     if (!distToEdge[dir][i])
-        return bb;
+        return 0ULL;
     if (!(bitboardRays[dir][i] & blockers))
         return bitboardRays[dir][i];
+
+    Bitboard bb = 0ULL;
 
     do
     {

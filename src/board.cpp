@@ -93,6 +93,11 @@ void Board::makeMove(Move move)
     newState->non_pawn_material = state->non_pawn_material;
     newState->pawn_material = state->pawn_material;
 
+    if (state->previous && state->previous->move.from() == move.to() && state->previous->move.to() == move.from())
+        newState->repetitions = state->repetitions + 1;
+    else
+        newState->repetitions = 0;
+
     // Update board
     if (move.type() & CASTLE)
     {
@@ -428,6 +433,7 @@ void Board::setFen(const std::string& fen)
     }
 
     state->numChecks = generateAttackBB(state->checkBB, ~sideToMove);
+    state->repetitions = 0;
 
     Bitboard other;
     generateAttackBB(other, sideToMove);

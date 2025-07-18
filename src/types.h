@@ -1,6 +1,8 @@
 #ifndef TYPES_H
 #define TYPES_H
 
+// #define MAGIC_GEN
+
 enum Color : unsigned int
 {
     WHITE,
@@ -151,6 +153,7 @@ constexpr MoveType operator|(MoveType a, MoveType b)
 typedef unsigned int Piece;
 typedef unsigned long long Bitboard;
 typedef int Score;
+typedef unsigned long long Key;
 
 // Forward declarations
 

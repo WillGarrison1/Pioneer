@@ -21,6 +21,7 @@ struct BoardState
 
     unsigned int numChecks;
     unsigned int ply; // Ply count
+    unsigned int repetitions;
 
     Score pawn_material;
     Score non_pawn_material;
@@ -152,6 +153,11 @@ class Board
     inline Score getNonPawnMaterial() const
     {
         return state->non_pawn_material;
+    }
+
+    inline unsigned int getRepetitions()
+    {
+        return state->repetitions;
     }
 
     bool whiteToMove; // True if white is to move

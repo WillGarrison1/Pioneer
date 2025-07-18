@@ -9,13 +9,8 @@
 #include "perft.h"
 #include "search.h"
 #include "square.h"
+#include "time.h"
 
-double getTime()
-{
-    return std::chrono::duration_cast<std::chrono::nanoseconds>(
-               std::chrono::high_resolution_clock::now().time_since_epoch())
-        .count();
-}
 
 Engine::Engine()
 {
@@ -44,15 +39,15 @@ void Engine::makemove(Move move)
     }
 }
 
-void Engine::go(unsigned int depth)
+void Engine::go(unsigned int depth, unsigned int nodes, unsigned int movetime)
 {
-    Move best = startSearch(board, depth);
+    Move best = startSearch(board, depth, nodes, movetime);
     std::cout << "Best Move: " << best.toString() << std::endl;
 }
 
 void Engine::goPerft(unsigned int depth)
 {
-    double start = getTime();
+    unsigned long long start = getTime();
     unsigned long long moveCount = 0;
 
     MoveList moves;
@@ -69,8 +64,8 @@ void Engine::goPerft(unsigned int depth)
 
         std::cout << move.toString() << ": " << count << "\n";
     }
-    double end = getTime();
-    std::cout << "Total Moves: " << moveCount << " Took: " << (end - start) / 1000000000.0 << std::endl;
+    unsigned long long end = getTime();
+    std::cout << "Total Moves: " << moveCount << " Took: " << (end - start) << " ms" << std::endl;
 }
 
 void Engine::eval()
