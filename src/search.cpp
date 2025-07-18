@@ -1,10 +1,7 @@
 #include "time.h"
-#include <atomic>
 #include <cmath>
-#include <condition_variable>
 #include <iostream>
-#include <memory>
-#include <thread>
+#include <cstring>
 
 #include "search.h"
 
@@ -112,7 +109,7 @@ Score qsearch(Board& board, int ply, Score alpha, Score beta, PVLine* prevLine)
         {
             pat = score;
             prevLine->moves[0] = m;
-            memcpy(prevLine->moves + 1, &line.moves, line.len * sizeof(Move));
+            std::memcpy(prevLine->moves + 1, &line.moves, line.len * sizeof(Move));
             prevLine->len = line.len + 1;
         }
     }
