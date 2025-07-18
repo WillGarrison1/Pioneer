@@ -82,7 +82,7 @@ constexpr Square operator>>(const Square sq, const int amt)
     return static_cast<Square>(static_cast<int>(sq) >> amt);
 }
 
-constexpr unsigned int manhattanDistance(const Square a, const Square b)
+inline unsigned int manhattanDistance(const Square a, const Square b)
 {
     return std::abs(getRank(a) - getRank(b)) + std::abs(getFile(a) - getFile(b));
 }

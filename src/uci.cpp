@@ -28,7 +28,7 @@ void Interface::run()
             break;
 
         else if (input == "uci")
-            std::cout << "id name PioneerV4.0\n"
+            std::cout << "id name PioneerV4.1\n"
                       << "id author Pioneer\n"
                       << "uciok\n";
 

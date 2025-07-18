@@ -1,7 +1,13 @@
 #include "square.h"
 #include "direction.h"
+#include <algorithm>
 
 int _distToEdge[19][64];
+
+/**
+ * @brief direction from a given square (NONE_DIR gives shortest distance to edge). A square bordering the edge is 0
+ * @example distToEdge[NORTH][SQ_A4]
+ */
 const int (*distToEdge)[64] = _distToEdge + 9;
 
 void initSquare()
@@ -22,5 +28,8 @@ void initSquare()
         _distToEdge[NORTH_WEST + 9][s] = std::min(7 - rank, (int)file);
         _distToEdge[SOUTH_EAST + 9][s] = std::min((int)rank, 7 - file);
         _distToEdge[SOUTH_WEST + 9][s] = std::min((int)rank, (int)file);
+
+        // Shortest distance to edge is at index 9
+        _distToEdge[9][s] = std::min(std::min(7 - rank, (int)rank), std::min(7 - file, (int)file));
     }
 }

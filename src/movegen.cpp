@@ -7,6 +7,7 @@
 #include "board.h"
 #include "color.h"
 #include "direction.h"
+#include "magic.h"
 #include "square.h"
 
 Direction isPinned(const Board& board, Square s)
@@ -23,7 +24,7 @@ Direction isPinned(const Board& board, Square s)
     open = bitboardPaths[s][lsb(kingBB)] & blockers & ~kingBB;
     if (!open) // Does piece have line of sight to king?
     {
-        open = sendRay(s, -dir, blockers);
+        open = (GetBishopMoves(blockers, s) | GetRookMoves(blockers, s)) & bitboardRays[-dir][s];
         switch (dir)
         {
         case NORTH:
@@ -61,7 +62,8 @@ Direction isPinned(const Board& board, Square s, Square enPassant)
     open = bitboardPaths[s][lsb(kingBB)] & blockers & ~kingBB;
     if (!open) // Does piece have line of sight to king?
     {
-        open = sendRay(s, -dir, blockers);
+        open = (GetBishopMoves(blockers, s) | GetRookMoves(blockers, s)) & bitboardRays[-dir][s];
+
         switch (dir)
         {
         case NORTH:
@@ -257,7 +259,7 @@ void generateBishopMoves(const Board& board, MoveList* list)
         if (pinned)
             pinnedBB = bitboardRays[pinned][from] | bitboardRays[-pinned][from];
 
-        Bitboard moves = slidingMoves(from, BISHOP, blockers) & open & pinnedBB & board.getState()->checkBB;
+        Bitboard moves = GetBishopMoves(blockers, from) & open & pinnedBB & board.getState()->checkBB;
         while (moves)
         {
             Square to = popLSB(moves);
@@ -282,7 +284,7 @@ void generateRookMoves(const Board& board, MoveList* list)
         if (pinned)
             pinnedBB = bitboardRays[pinned][from] | bitboardRays[-pinned][from];
 
-        Bitboard moves = slidingMoves(from, ROOK, blockers) & open & pinnedBB & board.getState()->checkBB;
+        Bitboard moves = GetRookMoves(blockers, from) & open & pinnedBB & board.getState()->checkBB;
         while (moves)
         {
             Square to = popLSB(moves);
@@ -306,7 +308,8 @@ void generateQueenMoves(const Board& board, MoveList* list)
 
         if (pinned)
             pinnedBB = bitboardRays[pinned][from] | bitboardRays[-pinned][from];
-        Bitboard moves = slidingMoves(from, QUEEN, blockers) & open & pinnedBB & board.getState()->checkBB;
+        Bitboard moves = (GetRookMoves(blockers, from) | GetBishopMoves(blockers, from)) & open & pinnedBB &
+                         board.getState()->checkBB;
         while (moves)
         {
             Square to = popLSB(moves);

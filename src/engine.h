@@ -14,12 +14,12 @@ class Engine
 
     void print()
     {
-        board.print();
+        board->print();
     }
 
     void setFen(const std::string& fen)
     {
-        board.setFen(fen);
+        board->setFen(fen);
     }
 
     void go(unsigned int depth, unsigned int nodes, unsigned int movetime);
@@ -30,13 +30,13 @@ class Engine
     void makemove(Move move);
     void undomove()
     {
-        board.undoMove();
+        board->undoMove();
     }
 
     void isCheck(Move move);
 
   private:
-    Board board;
+    Board* board;
 };
 
 #endif

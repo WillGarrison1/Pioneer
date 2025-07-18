@@ -11,29 +11,32 @@
 #include "square.h"
 #include "time.h"
 
-
 Engine::Engine()
 {
     initSquare();
     initDirection();
     initBBs();
+    InitMagics();
+
+    board = new Board;
 }
 
 Engine::~Engine()
 {
+    delete board;
 }
 
 void Engine::makemove(Move move)
 {
     MoveList legal;
-    generateMoves<ALL_MOVES>(board, &legal);
+    generateMoves<ALL_MOVES>(*board, &legal);
 
     for (int i = 0; i < legal.size; i++)
     {
         Move m = legal.moves[i];
         if (m.to() == move.to() && m.from() == move.from() && m.promotion() == move.promotion())
         {
-            board.makeMove(m);
+            board->makeMove(m);
             break;
         }
     }
@@ -41,7 +44,7 @@ void Engine::makemove(Move move)
 
 void Engine::go(unsigned int depth, unsigned int nodes, unsigned int movetime)
 {
-    Move best = startSearch(board, depth, nodes, movetime);
+    Move best = startSearch(*board, depth, nodes, movetime);
     std::cout << "Best Move: " << best.toString() << std::endl;
 }
 
@@ -51,14 +54,14 @@ void Engine::goPerft(unsigned int depth)
     unsigned long long moveCount = 0;
 
     MoveList moves;
-    generateMoves<ALL_MOVES>(board, &moves);
+    generateMoves<ALL_MOVES>(*board, &moves);
 
     for (int i = 0; i < moves.size; i++)
     {
         Move move = moves.moves[i];
-        board.makeMove(move);
-        unsigned long long count = perft(board, depth - 1);
-        board.undoMove();
+        board->makeMove(move);
+        unsigned long long count = perft(*board, depth - 1);
+        board->undoMove();
 
         moveCount += count;
 
@@ -70,23 +73,23 @@ void Engine::goPerft(unsigned int depth)
 
 void Engine::eval()
 {
-    Score score = Eval(board) * (board.whiteToMove ? 1 : -1);
+    Score score = Eval(*board) * (board->whiteToMove ? 1 : -1);
     std::cout << "Eval: " << score << std::endl;
-    std::cout << "Pawns: " << board.getPawnMaterial() << std::endl;
-    std::cout << "Other: " << board.getNonPawnMaterial() << std::endl;
+    std::cout << "Pawns: " << board->getPawnMaterial() << std::endl;
+    std::cout << "Other: " << board->getNonPawnMaterial() << std::endl;
 }
 
 void Engine::isCheck(Move move)
 {
     MoveList legal;
-    generateMoves<ALL_MOVES>(board, &legal);
+    generateMoves<ALL_MOVES>(*board, &legal);
 
     for (int i = 0; i < legal.size; i++)
     {
         Move m = legal.moves[i];
         if (m.to() == move.to() && m.from() == move.from() && m.promotion() == move.promotion())
         {
-            std::cout << board.isCheckMove(m) << std::endl;
+            std::cout << board->isCheckMove(m) << std::endl;
             break;
         }
     }

@@ -9,9 +9,12 @@ Bitboard knightMoves[64];
 Bitboard kingMoves[64];
 Bitboard pawnAttacks[9][64];
 Bitboard pawnMoves[9][64];
+Bitboard rookMasks[64];
+Bitboard bishopMasks[64];
 Bitboard bitboardPaths[64][64]; // bitboards with bits from one square to another (note that the start squares/first
                                 // index isn't included)
-Bitboard _bitboardRays[19][64] = {}; // bitboards with bits starting from a certain square heading off the board (start square isn't included)
+Bitboard _bitboardRays[19][64] =
+    {}; // bitboards with bits starting from a certain square heading off the board (start square isn't included)
 const Bitboard (*bitboardRays)[64] = _bitboardRays + 9;
 
 Bitboard passedPawnBB[9][64];
@@ -92,7 +95,7 @@ void initBBs()
         for (Direction dir = SOUTH_WEST; dir <= NORTH_EAST; dir++)
         {
             Square i = sqr;
-            while (distToEdge[dir][i] != 0)
+            while (dir && distToEdge[dir][i] != 0)
             {
                 i += dir;
                 setBit(_bitboardRays[dir + 9][sqr], i);
@@ -112,6 +115,11 @@ void initBBs()
                 }
             }
         }
+
+        rookMasks[sqr] =
+            bitboardRays[NORTH][sqr] | bitboardRays[SOUTH][sqr] | bitboardRays[EAST][sqr] | bitboardRays[WEST][sqr];
+        bishopMasks[sqr] = bitboardRays[SOUTH_WEST][sqr] | bitboardRays[SOUTH_EAST][sqr] |
+                           bitboardRays[NORTH_EAST][sqr] | bitboardRays[NORTH_WEST][sqr];
 
         // Passed pawn detection
         Rank rank = getRank(sqr);

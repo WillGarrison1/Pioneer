@@ -1,0 +1,2 @@
+v4.0 - Original
+v4.1 - Magic Bitboards

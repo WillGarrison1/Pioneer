@@ -49,6 +49,8 @@ extern Bitboard knightMoves[64];
 extern Bitboard kingMoves[64];
 extern Bitboard pawnAttacks[9][64];
 extern Bitboard pawnMoves[9][64];
+extern Bitboard rookMasks[64];
+extern Bitboard bishopMasks[64];
 extern Bitboard bitboardPaths[64][64];
 
 extern const Bitboard (*bitboardRays)[64];
@@ -87,12 +89,24 @@ inline bool getBit(const Bitboard bb, const Square sq)
 
 inline Square lsb(const Bitboard bb)
 {
+#if _MSC_VER
+    unsigned long index;
+    _BitScanForward64(&index, bb);
+    return static_cast<Square>(index);
+#else
     return static_cast<Square>(__builtin_ctzll(bb));
+#endif
 }
 
 inline Square msb(const Bitboard bb)
 {
+#if _MSC_VER
+    unsigned long index;
+    _BitScanReverse64(&index, bb);
+    return static_cast<Square>(index);
+#else
     return static_cast<Square>(__builtin_clzll(bb));
+#endif
 }
 
 inline Square popLSB(Bitboard& bb)
@@ -104,7 +118,11 @@ inline Square popLSB(Bitboard& bb)
 
 inline int popCount(const Bitboard bb)
 {
+#if _MSC_VER
+    return __popcnt64(bb);
+#else
     return __builtin_popcountll(bb);
+#endif
 }
 
 constexpr Bitboard operator>>(const Bitboard b, const Direction d)

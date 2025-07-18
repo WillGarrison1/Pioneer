@@ -482,7 +482,7 @@ unsigned int Board::generateAttackBB(Bitboard& checkBB, const Color side)
     while (bishops)
     {
         Square from = popLSB(bishops);
-        Bitboard moves = slidingMoves(from, BISHOP, blockers);
+        Bitboard moves = GetBishopMoves(blockers, from);
         if (moves & enemyKing)
         {
             checkBB = sqrToBB(from) | bitboardPaths[from][lsb(enemyKing)];
@@ -494,7 +494,7 @@ unsigned int Board::generateAttackBB(Bitboard& checkBB, const Color side)
     while (rooks)
     {
         Square from = popLSB(rooks);
-        Bitboard moves = slidingMoves(from, ROOK, blockers);
+        Bitboard moves = GetRookMoves(blockers, from);
         if (moves & enemyKing)
         {
             checkBB = sqrToBB(from) | bitboardPaths[from][lsb(enemyKing)];
@@ -506,7 +506,7 @@ unsigned int Board::generateAttackBB(Bitboard& checkBB, const Color side)
     while (queens)
     {
         Square from = popLSB(queens);
-        Bitboard moves = slidingMoves(from, QUEEN, blockers);
+        Bitboard moves = GetRookMoves(blockers, from) | GetBishopMoves(blockers, from);
         if (moves & enemyKing)
         {
             checkBB = sqrToBB(from) | bitboardPaths[from][lsb(enemyKing)];
@@ -569,7 +569,7 @@ bool Board::isCheckMove(Move move)
             if (!rookDir) // if there is no direction from where the rook is
                 return false;
 
-            Bitboard ray = sendRay(rookPos, rookDir, blockers & ~sqrToBB(move.from()));
+            Bitboard ray = GetRookMoves(blockers, rookPos);
             if (ray & enemyKing)
                 return true;
         }
@@ -595,7 +595,8 @@ bool Board::isCheckMove(Move move)
         ~enemyKing) // if there are blockers between the from square and the king
         return false;
 
-    Bitboard ray = sendRay(move.from(), -fromDir, blockers) & getBB(side);
+    Bitboard ray = (GetBishopMoves(blockers, move.from()) | GetRookMoves(blockers, move.from())) &
+                   bitboardRays[-fromDir][move.from()] & getBB(side);
     if (!ray)
         return false;
 
@@ -616,4 +617,5 @@ bool Board::isCheckMove(Move move)
 
 std::string Board::getFen() const
 {
+    return "";
 }

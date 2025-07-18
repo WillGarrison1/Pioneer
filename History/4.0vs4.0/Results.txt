@@ -1,0 +1,24 @@
+Score of PioneerV4 vs PioneerV4 - Copy: 25 - 32 - 43 [0.465]
+...      PioneerV4 playing White: 13 - 17 - 20  [0.460] 50
+...      PioneerV4 playing Black: 12 - 15 - 23  [0.470] 50
+...      White vs Black: 28 - 29 - 43  [0.495] 100
+Elo difference: -24.4 +/- 51.8, LOS: 17.7 %, DrawRatio: 43.0 %
+SPRT: llr 0 (0.0%), lbound -inf, ubound inf
+100 of 100 games finished.
+
+Player: PioneerV4
+   "Draw by 3-fold repetition": 40
+   "Draw by fifty moves rule": 1
+   "Draw by insufficient mating material": 2
+   "Loss: Black mates": 17
+   "Loss: White mates": 15
+   "Win: Black mates": 12
+   "Win: White mates": 13
+Player: PioneerV4 - Copy
+   "Draw by 3-fold repetition": 40
+   "Draw by fifty moves rule": 1
+   "Draw by insufficient mating material": 2
+   "Loss: Black mates": 12
+   "Loss: White mates": 13
+   "Win: Black mates": 17
+   "Win: White mates": 15

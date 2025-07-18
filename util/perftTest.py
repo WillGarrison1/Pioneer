@@ -4,7 +4,7 @@ import pexpect.popen_spawn
 
 pioneer = pexpect.popen_spawn.PopenSpawn("build/pioneerV4.exe")
 
-pioneer.expect("PioneerV4.0>")
+pioneer.expect("PioneerV4.1>")
 pioneer.sendline("go perft 6")
 
 while True:
