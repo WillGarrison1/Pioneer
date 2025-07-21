@@ -5,13 +5,16 @@
 #include "board.h"
 #include "color.h"
 
-#define DEFENDED_BONUS 10
-#define ATTACKED_PENALTY -15
-#define REACH_MULTIPLIER 2
-#define DOUBLED_PAWNS_PENALTY -20
-#define ISOLATED_PAWN_PENALTY -30
-#define PASSED_PAWN_BONUS 50
-#define MOVING_BONUS 5
+#define DEFENDED_BONUS 10    // bonus for defended piece
+#define ATTACKED_PENALTY -15 // penalty for attacked piece
+
+#define KING_ATTACKED -15 // penalty for squares attacked adjacent to king
+
+#define REACH_MULTIPLIER 2        // multiplier for reach (number of defended squares) bonue
+#define DOUBLED_PAWNS_PENALTY -20 // penalty for doubled pawns
+#define ISOLATED_PAWN_PENALTY -30 // penalty for isolated pawns
+#define PASSED_PAWN_BONUS 50      // bonus for passed pawns
+#define MOVING_BONUS 5            // small bonus for moving side
 
 /**
  * @brief Evaluates a Piece from White's perspective
@@ -36,23 +39,43 @@ Score EvalPiece(const Board& board)
     {
         piece = popLSB(pieceW);
         score += GetPSQValue<P, WHITE>(piece);
-        if constexpr (P != KING)
-        {
-            score += defendedW & sqrToBB(piece) ? DEFENDED_BONUS * P : 0;
-            score += defendedB & sqrToBB(piece) ? ATTACKED_PENALTY * P : 0;
-        }
+        score += defendedW & sqrToBB(piece) ? DEFENDED_BONUS + P : 0;
+        score += defendedB & sqrToBB(piece) ? ATTACKED_PENALTY + P : 0;
     }
 
     while (pieceB)
     {
         piece = popLSB(pieceB);
         score -= GetPSQValue<P, BLACK>(piece);
-        if constexpr (P != KING)
-        {
-            score -= defendedB & sqrToBB(piece) ? DEFENDED_BONUS * P : 0;
-            score -= defendedW & sqrToBB(piece) ? ATTACKED_PENALTY * P : 0;
-        }
+        score -= defendedB & sqrToBB(piece) ? DEFENDED_BONUS + P : 0;
+        score -= defendedW & sqrToBB(piece) ? ATTACKED_PENALTY + P : 0;
     }
+
+    return score;
+}
+
+template <>
+Score EvalPiece<KING>(const Board& board)
+{
+    Score score = 0;
+
+    const Square pieceW = lsb(board.getBB(WHITE, KING));
+    const Square pieceB = lsb(board.getBB(BLACK, KING));
+
+    const Bitboard defendedW = board.getAttacked(WHITE);
+    const Bitboard defendedB = board.getAttacked(BLACK);
+
+    // Evaluate king safety by number of squares attacked adjacent to king
+    score += GetPSQValue<KING, WHITE>(pieceW);
+    score -= GetPSQValue<KING, BLACK>(pieceB);
+
+    Bitboard attackedKingWSquares = kingMoves[pieceW] & defendedB;
+
+    score += popCount(attackedKingWSquares) * KING_ATTACKED;
+
+    Bitboard attackedKingBSquares = kingMoves[pieceB] & defendedW;
+
+    score -= popCount(attackedKingBSquares) * KING_ATTACKED;
 
     return score;
 }
@@ -79,7 +102,7 @@ Score EvalPiece<PAWN>(const Board& board)
                      (popCount(fBB & pawnW) - 1); // multiply penalty by the number of pawns doubled minus one
         if (popCount(fBB & pawnB) > 1)
             score -= DOUBLED_PAWNS_PENALTY *
-                     (popCount(fBB & pawnW) - 1); // multiply penalty by the number of pawns doubled minus one
+                     (popCount(fBB & pawnB) - 1); // multiply penalty by the number of pawns doubled minus one
     }
 
     Square piece;
@@ -128,6 +151,8 @@ Score EvalPiece<PAWN>(const Board& board)
 
 Score Eval(Board& board)
 {
+    //..
+
     Score score = EvalPiece<PAWN>(board) + EvalPiece<KNIGHT>(board) + EvalPiece<BISHOP>(board) +
                   EvalPiece<ROOK>(board) + EvalPiece<QUEEN>(board) + EvalPiece<KING>(board);
 

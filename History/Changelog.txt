@@ -1,2 +1,4 @@
 v4.0 - Original
 v4.1 - Magic Bitboards
+v4.2 - Transposition table, some Evaluation tweaks, and smaller (and continuous) magic table arrays
+v4.3 - Improved and fixed draw detection

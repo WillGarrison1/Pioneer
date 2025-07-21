@@ -10,12 +10,14 @@
 #include "search.h"
 #include "square.h"
 #include "time.h"
+#include "transposition.h"
 
 Engine::Engine()
 {
     initSquare();
     initDirection();
     initBBs();
+    InitZobrist();
     InitMagics();
 
     board = new Board;
@@ -67,6 +69,7 @@ void Engine::goPerft(unsigned int depth)
 
         std::cout << move.toString() << ": " << count << "\n";
     }
+
     unsigned long long end = getTime();
     std::cout << "Total Moves: " << moveCount << " Took: " << (end - start) << " ms" << std::endl;
 }

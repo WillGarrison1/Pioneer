@@ -2,6 +2,7 @@
 #define BITBOARD_H
 
 #include "types.h"
+#include <cassert>
 
 const Bitboard emptyBB = 0ULL;
 const Bitboard fullBB = 0xFFFFFFFFFFFFFFFFULL;
@@ -89,6 +90,7 @@ inline bool getBit(const Bitboard bb, const Square sq)
 
 inline Square lsb(const Bitboard bb)
 {
+    assert(bb != 0);
 #if _MSC_VER
     unsigned long index;
     _BitScanForward64(&index, bb);
@@ -100,6 +102,7 @@ inline Square lsb(const Bitboard bb)
 
 inline Square msb(const Bitboard bb)
 {
+    assert(bb != 0);
 #if _MSC_VER
     unsigned long index;
     _BitScanReverse64(&index, bb);

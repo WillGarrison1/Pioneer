@@ -2,6 +2,7 @@
 #define ENGINE_H
 
 #include "board.h"
+#include <iostream>
 
 /**
  * @brief Chess engine class

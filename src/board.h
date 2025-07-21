@@ -16,17 +16,26 @@ struct BoardState
     CastlingRights castling; // Castling rights
     Move move;               // Move that led to this board state
 
-    Bitboard attacks[BLACK + 1];
+    Bitboard pieceAttacks[64];   // the attacks that each piece has (except pawns)
+    Bitboard attacks[BLACK + 1]; // the attacks a side has
     Bitboard checkBB;
 
     unsigned int numChecks;
     unsigned int ply; // Ply count
-    unsigned int repetitions;
+    unsigned int move50rule;
 
     Score pawn_material;
     Score non_pawn_material;
 
+    Key zobristHash;
+
     BoardState* previous;
+
+    BoardState();
+    BoardState(BoardState *prev);
+    
+
+    ~BoardState();
 };
 
 class Board
@@ -40,6 +49,10 @@ class Board
     void addPiece(Piece piece, Square square);
     void removePiece(Square square);
     void movePiece(Square from, Square to);
+
+    void addPieceZobrist(Piece piece, Square to, Key* key);  // moves the piece and updates the zobrist hash
+    void removePieceZobrist(Square from, Key* key);          // moves the piece and updates the zobrist hash
+    void movePieceZobrist(Square from, Square to, Key* key); // moves the piece and updates the zobrist hash
 
     void makeMove(Move move);
     void undoMove();
@@ -124,6 +137,16 @@ class Board
     {
         return state->attacks[c];
     }
+    /**
+     * @brief Gets the attacks that a piece on a given square has
+     *
+     * @param s the square the piece is on
+     * @return Bitboard
+     */
+    inline Bitboard getPieceAttacks(Square s) const
+    {
+        return state->pieceAttacks[s];
+    }
 
     /**
      * @brief Get the number of checks on the king
@@ -155,9 +178,11 @@ class Board
         return state->non_pawn_material;
     }
 
-    inline unsigned int getRepetitions()
+    unsigned int getRepetition(); // gets the amount of times this position appeared on the board
+
+    inline Key getHash()
     {
-        return state->repetitions;
+        return state->zobristHash;
     }
 
     bool whiteToMove; // True if white is to move

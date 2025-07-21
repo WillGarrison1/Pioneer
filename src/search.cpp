@@ -1,12 +1,13 @@
 #include "time.h"
 #include <cmath>
-#include <iostream>
 #include <cstring>
+#include <iostream>
 
 #include "search.h"
 
 #include "MoveSort.h"
 #include "evaluate.h"
+#include "transposition.h"
 
 #define INF 1000000
 #define MATE 100000
@@ -21,6 +22,8 @@ unsigned long long numNodes;
 unsigned long long maxNodes;
 unsigned long long maxTime;
 unsigned long long startTime;
+static TranspositionTable* tTable =
+    new TranspositionTable(1024 * 1024 * 256); // transposition table with a size of 64 MB
 
 bool isDone;
 
@@ -48,11 +51,29 @@ std::string GetMoveListString(PVLine* l)
     return moves;
 }
 
-Score qsearch(Board& board, int ply, Score alpha, Score beta, PVLine* prevLine)
+Score qsearch(Board& board, int ply, Score alpha, Score beta)
 {
-    prevLine->len = 0;
-
     numNodes++;
+
+    // probe tt
+
+    TranspositionEntry* entry = tTable->GetEntry(board.getHash());
+    if (entry && entry->depth >= 0)
+    {
+        if (entry->nodeType == NodeType::Exact)
+        {
+            return entry->score;
+        }
+        if (entry->nodeType == NodeType::Upper && entry->score <= alpha)
+        {
+            return entry->score;
+        }
+        if (entry->nodeType == NodeType::Lower && entry->score >= beta)
+        {
+            return entry->score;
+        }
+    }
+
     Score pat = Eval(board);
 
     if (pat >= beta)
@@ -94,13 +115,11 @@ Score qsearch(Board& board, int ply, Score alpha, Score beta, PVLine* prevLine)
         Move m = moves.moves[i];
 
         board.makeMove(m);
-        Score score = -qsearch(board, ply + 1, -beta, -alpha, &line);
+        Score score = -qsearch(board, ply + 1, -beta, -alpha);
         board.undoMove();
 
         if (score >= beta)
         {
-            prevLine->moves[0] = m;
-            prevLine->len = 1;
             return score;
         }
         if (score > alpha)
@@ -108,9 +127,6 @@ Score qsearch(Board& board, int ply, Score alpha, Score beta, PVLine* prevLine)
         if (score > pat)
         {
             pat = score;
-            prevLine->moves[0] = m;
-            std::memcpy(prevLine->moves + 1, &line.moves, line.len * sizeof(Move));
-            prevLine->len = line.len + 1;
         }
     }
 
@@ -119,37 +135,74 @@ Score qsearch(Board& board, int ply, Score alpha, Score beta, PVLine* prevLine)
 
 Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* prevLine)
 {
+    numNodes++;
+
     if (isDone)
-        return alpha;
+        return 0;
 
-    unsigned long long time = getTime();
-
-    if (time - startTime > maxTime)
+    if (ply == 0 || depth >= 3)
     {
-        isDone = true;
-        return alpha; //! Maybe return 0 here
+        unsigned long long time = getTime();
+
+        if (time - startTime > maxTime)
+        {
+            isDone = true;
+            return 0;
+        }
+
+        if (numNodes > maxNodes)
+        {
+            isDone = true;
+            return 0;
+        }
     }
 
-    if (numNodes > maxNodes)
+    if (board.getRepetition() == 3)
     {
-        isDone = true;
-        return alpha;
+        return 0; // draw by repetition
+    }
+    if (board.getState()->move50rule == 50)
+        return 0; // 50 move
+
+    bool replaceTT = true;
+    TranspositionEntry* entry = tTable->GetEntry(board.getHash());
+
+    Move bestEntryMove = 0;
+
+    if (entry)
+    {
+        if (entry->depth >= depth)
+        {
+            if (entry->nodeType == NodeType::Exact)
+            {
+                return entry->score;
+            }
+            if (entry->nodeType == NodeType::Upper && entry->score <= alpha)
+            {
+                return entry->score;
+            }
+            if (entry->nodeType == NodeType::Lower && entry->score >= beta)
+            {
+                return entry->score;
+            }
+            replaceTT = false;
+        }
+
+        if (entry->age < (int)board.getState()->ply - 25)
+            replaceTT = true;
+
+        bestEntryMove = entry->move;
     }
 
     if (depth == 0)
     {
-        return qsearch(board, ply, alpha, beta, prevLine);
+        return qsearch(board, ply, alpha, beta);
     }
 
     prevLine->len = 0;
 
-    numNodes++;
-
     MoveList moves;
     generateMoves<ALL_MOVES>(board, &moves);
-
-    if (board.getRepetitions() == 6)
-        return 0; // draw by repetition
 
     if (moves.size == 0)
     {
@@ -159,11 +212,17 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
             return 0;
     }
 
-    SortMoves(board, &moves);
+    if (bestEntryMove.getMove())
+        SortMoves(board, &moves, bestEntryMove);
+    else
+        SortMoves(board, &moves);
 
     PVLine line;
 
-    Score best = -INF;
+    Score bestS = -INF;
+    Move bestM = 0;
+
+    NodeType nodeType = NodeType::Upper;
 
     for (int i = 0; i < moves.size; i++)
     {
@@ -177,6 +236,8 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
         //     newDepth--;
 
         board.makeMove(move);
+
+        Key childHash = board.getHash();
 
         // Futility pruning
         // if (depth < FUTILITY_DEPTH && move.type() == QUIET && !board.getNumChecks())
@@ -193,31 +254,42 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
         if (board.getNumChecks()) // check extension
             newDepth++;
 
-        Score score = -search(board, std::max(newDepth, 0), ply + 1, -beta, -alpha, &line);
+        newDepth = std::max(newDepth, 0);
+
+        Score score = -search(board, newDepth, ply + 1, -beta, -alpha, &line);
         board.undoMove();
 
         if (isDone)
-            break;
+            return 0;
 
         if (score >= beta)
         {
             prevLine->moves[0] = move;
             prevLine->len = 1;
+
+            tTable->SetEntry(board.getHash(), score, newDepth, NodeType::Lower, board.getState()->ply, move);
+
             return score;
         }
         if (score > alpha)
-            alpha = score;
-
-        if (score > best)
         {
-            best = score;
+            nodeType = NodeType::Exact;
+            alpha = score;
+        }
+        if (score > bestS)
+        {
+            bestS = score;
+            bestM = move;
             prevLine->moves[0] = move;
             memcpy(prevLine->moves + 1, &line.moves, line.len * sizeof(Move));
             prevLine->len = line.len + 1;
         }
     }
 
-    return best;
+    if (replaceTT)
+        tTable->SetEntry(board.getHash(), bestS, depth, nodeType, board.getState()->ply, bestM);
+
+    return bestS;
 }
 
 Score iterativeDeepening(Board& board, unsigned int depth, unsigned int nodes, unsigned int movetime)
@@ -227,8 +299,8 @@ Score iterativeDeepening(Board& board, unsigned int depth, unsigned int nodes, u
     PVLine pv;
     pv.len = 0;
 
-    Move prevBestMove;
-    Score prevBestScore;
+    Move prevBestMove = 0;
+    Score prevBestScore = -INF;
 
     bestMove = 0;
     bestScore = -INF;
@@ -280,13 +352,13 @@ Score iterativeDeepening(Board& board, unsigned int depth, unsigned int nodes, u
                 pv.len = line.len + 1;
 
                 std::cout << "info depth " << d << " curmov " << bestMove.toString() << " score cp " << bestScore
-                          << " nodes " << numNodes << " pv " << GetMoveListString(&pv) << "time "
-                          << getTime() - startTime << std::endl;
+                          << " nodes " << numNodes << " pv " << GetMoveListString(&pv) << std::endl;
             }
         }
 
         std::cout << "info depth " << d << " curmov " << bestMove.toString() << " score cp " << bestScore << " nodes "
-                  << numNodes << " pv " << GetMoveListString(&pv) << std::endl;
+                  << numNodes << " pv " << GetMoveListString(&pv) << "hashfull " << (int)(tTable->GetFull() * 1000)
+                  << " time " << getTime() - startTime << std::endl;
 
         prevBestMove = bestMove;
         prevBestScore = bestScore;
