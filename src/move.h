@@ -21,7 +21,7 @@
  */
 class Move
 {
-  public:
+public:
     constexpr Move() : m_move(0)
     {
     }
@@ -35,7 +35,7 @@ class Move
     Move(unsigned int move) : m_move(move)
     {
     }
-    Move(const Move& move) : m_move(move.m_move)
+    Move(const Move &move) : m_move(move.m_move)
     {
     }
     Move(const std::string str);
@@ -75,6 +75,15 @@ class Move
         return static_cast<PieceType>((m_move >> 29) & 0x7);
     }
 
+    // Tells if a move is of a type
+    template <MoveType T>
+    constexpr bool isType()
+    {
+        if constexpr (T == QUIET)
+            return type() == QUIET;
+        return (type() & T);
+    }
+
     constexpr unsigned int getMove() const
     {
         return m_move;
@@ -82,7 +91,7 @@ class Move
 
     std::string toString();
 
-  private:
+private:
     unsigned int m_move;
 };
 
@@ -91,10 +100,15 @@ constexpr bool operator==(Move m1, Move m2)
     return m1.getMove() == m2.getMove();
 }
 
+constexpr bool operator!=(Move m1, Move m2)
+{
+    return m1.getMove() != m2.getMove();
+}
+
 struct MoveList
 {
     Move moves[256];
-    int size = 0;
+    unsigned char size = 0;
 
     void addMove(Move move)
     {
@@ -113,7 +127,7 @@ struct MoveList
         return moves[index];
     }
 
-    Move& operator[](int index)
+    Move &operator[](int index)
     {
         assert(index < size);
         return moves[index];

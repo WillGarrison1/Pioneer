@@ -4,6 +4,8 @@
 #include "move.h"
 #include "types.h"
 
+#define BUCKET_SIZE 3
+
 enum class NodeType : unsigned char
 {
     Exact,
@@ -13,17 +15,23 @@ enum class NodeType : unsigned char
 
 struct TranspositionEntry
 {
-    unsigned short key;  // the upper 16 bits of the zobrist hash
+    unsigned int key; // the upper 16 bits of the zobrist hash
+    Score score;      // The score of this position at depth
+    Move move;        // best move to be played
+
+    NodeType nodeType;   // the bounds of this positions score
     unsigned char depth; // the depth the score was calculated at
     unsigned char age;   // the ply at which this position is
-    Score score;         // The score of this position at depth
-    NodeType nodeType;   // the bounds of this positions score
-    Move move;           // best move to be played
+};
+
+struct TranspositionBucket
+{
+    TranspositionEntry entries[BUCKET_SIZE];
 };
 
 class TranspositionTable
 {
-  public:
+public:
     /**
      * @brief Construct a new Transposition Table object
      *
@@ -33,15 +41,15 @@ class TranspositionTable
 
     ~TranspositionTable();
 
-    TranspositionEntry* GetEntry(Key key);
+    TranspositionEntry *GetEntry(Key key);
 
     void SetEntry(Key zobrist, Score score, unsigned char depth, NodeType nodeType, unsigned char ply, Move bestMove);
 
     float GetFull(); // gets how full the table is, from 0-1
 
-  private:
-    TranspositionEntry* entries;
-    unsigned long long numEntries;
+private:
+    TranspositionBucket *buckets;
+    unsigned long long numBuckets;
 };
 
 extern Key boardHashes[64][(KING | BLACK) + 1];

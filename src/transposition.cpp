@@ -1,6 +1,7 @@
 #include "transposition.h"
 #include "random.h"
 #include <cstring>
+#include <iostream>
 
 Key boardHashes[64][(KING | BLACK) + 1];
 Key isBlackHash;
@@ -9,32 +10,61 @@ Key enPassantHash[8];
 
 TranspositionTable::TranspositionTable(unsigned long long size)
 {
-    this->numEntries = size / sizeof(TranspositionEntry);
-    this->entries = new TranspositionEntry[numEntries];
+    assert(size != 0);
+    this->numBuckets = 1ULL << (63 - __builtin_clzll(size / sizeof(TranspositionBucket))); // round down to nearest power of two
+    std::cout << "Num Buckets: " << this->numBuckets << std::endl;
 
-    memset(entries, 0, numEntries * sizeof(TranspositionEntry));
+    this->buckets = new TranspositionBucket[numBuckets];
+
+    memset(buckets, 0, numBuckets * sizeof(TranspositionBucket));
 }
 
 TranspositionTable::~TranspositionTable()
 {
-    delete[] entries;
+    delete[] buckets;
 }
 
-TranspositionEntry* TranspositionTable::GetEntry(Key key)
+TranspositionEntry *TranspositionTable::GetEntry(Key key)
 {
-    unsigned long long index = key & (this->numEntries - 1);
-    TranspositionEntry* entry = &this->entries[index];
-    if (entry->key == key >> 48)
-        return entry;
+    unsigned long long index = key & (this->numBuckets - 1);
+    TranspositionBucket *bucket = &this->buckets[index];
+
+    for (TranspositionEntry &entry : bucket->entries)
+        if (entry.key == key >> 32)
+            return &entry;
     return nullptr;
 }
 
 void TranspositionTable::SetEntry(Key zobrist, Score score, unsigned char depth, NodeType nodeType, unsigned char ply,
                                   Move bestMove)
 {
-    unsigned long long index = zobrist & (this->numEntries - 1);
-    TranspositionEntry* entry = &this->entries[index];
-    entry->key = zobrist >> 48;
+    unsigned long long index = zobrist & (this->numBuckets - 1); // much faster than modulo
+    TranspositionBucket *bucket = &this->buckets[index];
+
+    TranspositionEntry *entry = nullptr;
+    int maxPoints = INT_MIN;
+
+    for (TranspositionEntry &e : bucket->entries)
+    {
+        if (!e.key) // just fill entry if empty
+        {
+            entry = &e;
+            break;
+        }
+
+        int points = 0;
+        if (e.age < ply)
+            points += 4;           // punish for being older
+        points += depth - e.depth; // punish for having a lower depth (higher points = worse)
+
+        if (maxPoints < points)
+        {
+            entry = &e;
+            maxPoints = points;
+        }
+    }
+
+    entry->key = zobrist >> 32;
     entry->score = score;
     entry->depth = depth;
     entry->nodeType = nodeType;
@@ -45,13 +75,14 @@ void TranspositionTable::SetEntry(Key zobrist, Score score, unsigned char depth,
 float TranspositionTable::GetFull()
 {
     unsigned long long valid = 0;
-    for (unsigned long long i = 0; i < this->numEntries; i++)
+    for (unsigned long long i = 0; i < this->numBuckets; i++)
     {
-        if (entries[i].key)
-            valid++;
+        for (TranspositionEntry &e : buckets[i].entries)
+            if (e.key)
+                valid++;
     }
 
-    return (float)valid / (float)numEntries;
+    return (float)valid / ((float)numBuckets * BUCKET_SIZE);
 }
 
 void InitZobrist()

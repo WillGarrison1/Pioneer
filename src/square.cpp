@@ -33,3 +33,15 @@ void initSquare()
         _distToEdge[9][s] = std::min(std::min(7 - rank, (int)rank), std::min(7 - file, (int)file));
     }
 }
+
+std::string sqrToString(Square s)
+{
+    File f = getFile(s);
+    Rank r = getRank(s);
+
+    std::string sStr;
+    sStr += ('a' + f);
+    sStr += ('1' + r);
+
+    return sStr;
+}

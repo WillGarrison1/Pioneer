@@ -4,6 +4,7 @@
 #include "bitboard.h"
 #include "board.h"
 #include "color.h"
+#include "profile.h"
 
 #define DEFENDED_BONUS 10    // bonus for defended piece
 #define ATTACKED_PENALTY -15 // penalty for attacked piece
@@ -23,8 +24,9 @@
  * @return Score
  */
 template <PieceType P>
-Score EvalPiece(const Board& board)
+Score EvalPiece(const Board &board)
 {
+
     Score score = 0;
 
     Bitboard pieceW = board.getBB(WHITE, P);
@@ -55,7 +57,7 @@ Score EvalPiece(const Board& board)
 }
 
 template <>
-Score EvalPiece<KING>(const Board& board)
+Score EvalPiece<KING>(const Board &board)
 {
     Score score = 0;
 
@@ -81,7 +83,7 @@ Score EvalPiece<KING>(const Board& board)
 }
 
 template <>
-Score EvalPiece<PAWN>(const Board& board)
+Score EvalPiece<PAWN>(const Board &board)
 {
     Score score = 0;
 
@@ -149,15 +151,15 @@ Score EvalPiece<PAWN>(const Board& board)
     return score;
 }
 
-Score Eval(Board& board)
+Score Eval(Board &board)
 {
-    //..
+    PROFILE_FUNC();
 
     Score score = EvalPiece<PAWN>(board) + EvalPiece<KNIGHT>(board) + EvalPiece<BISHOP>(board) +
                   EvalPiece<ROOK>(board) + EvalPiece<QUEEN>(board) + EvalPiece<KING>(board);
 
     // Add bonus for the amount of squares attacked/defended by each side
-    score += (popCount(board.getAttacked(WHITE)) - popCount(board.getAttacked(BLACK))) * REACH_MULTIPLIER;
+    // score += (popCount(board.getAttacked(WHITE)) - popCount(board.getAttacked(BLACK))) * REACH_MULTIPLIER;
 
     score += board.getPawnMaterial() + board.getNonPawnMaterial(); // score material
 

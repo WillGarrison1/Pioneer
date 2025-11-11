@@ -11,25 +11,12 @@
  */
 inline unsigned long long getTime()
 {
-    return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch())
-        .count();
+    return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
 }
 
-#define BENCHMARK() Benchmark __bench__
-
-class Benchmark
+inline unsigned long long getTimeNS()
 {
-  public:
-    Benchmark() : start(getTime())
-    {
-    }
-    ~Benchmark()
-    {
-        std::cout << "Took: " << getTime() - start << " ms" << std::endl;
-    }
-
-  private:
-    unsigned long long start;
-};
+    return std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+}
 
 #endif

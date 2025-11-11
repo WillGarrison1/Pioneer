@@ -9,8 +9,10 @@
 #include "perft.h"
 #include "search.h"
 #include "square.h"
+#include "MoveSort.h"
 #include "time.h"
 #include "transposition.h"
+#include <cstring>
 
 Engine::Engine()
 {
@@ -19,6 +21,9 @@ Engine::Engine()
     initBBs();
     InitZobrist();
     InitMagics();
+
+    std::memset(moveHistory, 0, sizeof(moveHistory));
+    std::memset(killerMoves, 0, sizeof(killerMoves));
 
     board = new Board;
 }
@@ -42,6 +47,8 @@ void Engine::makemove(Move move)
             break;
         }
     }
+
+    std::cout << board->getHash() << std::endl;
 }
 
 void Engine::go(unsigned int depth, unsigned int nodes, unsigned int movetime)

@@ -9,11 +9,13 @@
 
 #include <algorithm>
 
-#define CAPTURE_BONUS 200
-#define PROMOTION_BONUS 500
+#define CAPTURE_BONUS 5000
+#define PROMOTION_BONUS 4000
 #define DEFENDED_BONUS 25
 #define ATTACKED_PENALTY -35
-#define PV_BONUS 1000
+#define PV_BONUS 30000
+#define KILLER_MOVE_BONUS 3000
+#define MAX_HISTORY 500
 #define CHECK_BONUS 20
 
 struct MoveVal
@@ -28,43 +30,88 @@ struct MoveVal
     }
 };
 
-inline MoveVal ScoreMove(Board& board, Move m)
+extern Move killerMoves[MAX_PLY][2]; // each ply can have two killer moves
+extern int moveHistory[2][64][64];   // History for [isBlack][from][to]
+
+inline bool isKillerMove(unsigned char ply, Move m)
 {
+    return killerMoves[ply][0] == m || killerMoves[ply][1] == m;
+}
+
+inline void addKillerMove(unsigned char ply, Move m)
+{
+    if (isKillerMove(ply, m))
+        return;
+
+    killerMoves[ply][1] = killerMoves[ply][0];
+    killerMoves[ply][0] = m;
+}
+
+inline void addHistoryBonus(bool isBlack, Move m, int depth)
+{
+    int clampedBonus = std::clamp(depth * depth, -MAX_HISTORY, MAX_HISTORY);
+    moveHistory[isBlack][m.from()][m.to()] += clampedBonus - moveHistory[isBlack][m.from()][m.to()] * std::abs(clampedBonus) / MAX_HISTORY;
+}
+
+inline void addHistoryPenalty(bool isBlack, Move m, int depth)
+{
+
+    const int penalty = std::clamp(depth * depth, -MAX_HISTORY, MAX_HISTORY);
+    moveHistory[isBlack][m.from()][m.to()] -= penalty + moveHistory[isBlack][m.from()][m.to()] * std::abs(penalty) / MAX_HISTORY;
+}
+
+inline Score Mvv_Lva_Score(PieceType victim, PieceType attacker)
+{
+    return pieceScores[victim] - (pieceScores[attacker] >> 3);
+}
+
+inline MoveVal ScoreMove(Board &board, Move m)
+{
+    const Color us = getColor(m.piece());
+
     MoveVal v(m, 0);
 
+    if (isKillerMove(board.getPly(), m))
+        v.score += KILLER_MOVE_BONUS;
+
     if (m.type() & CAPTURE) // bonus for captures
-        v.score += static_cast<int>(getType(m.captured())) - static_cast<int>(getType(m.piece())) + CAPTURE_BONUS;
+        v.score += Mvv_Lva_Score(getType(m.captured()), getType(m.piece())) + CAPTURE_BONUS;
 
     if (m.type() & PROMOTION) // bonus for promotions
-        v.score += static_cast<int>(getType(m.promotion())) + PROMOTION_BONUS;
+        v.score += pieceScores[getType(m.promotion())] + PROMOTION_BONUS;
 
-    if (sqrToBB(m.to()) & board.getAttacked(~board.sideToMove)) // penalty for moving piece to attacked square
-        v.score += ATTACKED_PENALTY - 5 * getType(m.piece());
+    if (m.isType<QUIET>())
+        v.score += moveHistory[board.sideToMove == BLACK][m.from()][m.to()];
 
-    if (sqrToBB(m.to()) & board.getAttacked(board.sideToMove)) // bonus for moving piece to defended square
-        v.score += DEFENDED_BONUS + 3 * getType(m.piece());
+    // if (sqrToBB(m.to()) & board.getAttacked(~us)) // penalty for moving piece to attacked square
+    //     v.score += ATTACKED_PENALTY - pieceScores[getType(m.piece())] >> 5;
 
-    v.score += board.whiteToMove
+    // if (sqrToBB(m.to()) & board.getAttacked(us)) // bonus for moving piece to defended square
+    //     v.score += DEFENDED_BONUS + pieceScores[getType(m.piece())] >> 5;
+
+    v.score += us == WHITE
                    ? GetPSQValue<WHITE>(getType(m.piece()), m.to()) - GetPSQValue<WHITE>(getType(m.piece()), m.from())
                    : GetPSQValue<BLACK>(getType(m.piece()), m.to()) - GetPSQValue<BLACK>(getType(m.piece()), m.from());
 
     return v;
 }
 
-inline MoveVal ScoreMoveQ(Board& board, Move m)
+inline MoveVal ScoreMoveQ(Board &board, Move m)
 {
+    const Color us = getColor(m.piece());
+
     MoveVal v(m, 0);
 
-    v.score += static_cast<int>(getType(m.captured())) - static_cast<int>(getType(m.piece())) + CAPTURE_BONUS;
+    v.score += Mvv_Lva_Score(getType(m.captured()), getType(m.piece()));
 
     if (m.type() & PROMOTION) // bonus for promotions
-        v.score += static_cast<int>(getType(m.promotion())) + PROMOTION_BONUS;
+        v.score += pieceScores[getType(m.promotion())] + PROMOTION_BONUS;
 
-    if (sqrToBB(m.to()) & board.getAttacked(~board.sideToMove)) // penalty for moving piece to attacked square
-        v.score += ATTACKED_PENALTY;
+    // if (sqrToBB(m.to()) & board.getAttacked(~us)) // penalty for moving piece to attacked square
+    //     v.score += ATTACKED_PENALTY;
 
-    if (sqrToBB(m.to()) & board.getAttacked(board.sideToMove)) // bonus for moving piece to defended square
-        v.score += DEFENDED_BONUS;
+    // if (sqrToBB(m.to()) & board.getAttacked(us)) // bonus for moving piece to defended square
+    //     v.score += DEFENDED_BONUS;
 
     return v;
 }
@@ -75,7 +122,7 @@ inline MoveVal ScoreMoveQ(Board& board, Move m)
  * @param board
  * @param moves
  */
-inline void SortMovesQ(Board& board, MoveList* moves)
+inline void SortMovesQ(Board &board, MoveList *moves)
 {
     MoveVal vals[256];
 
@@ -84,7 +131,8 @@ inline void SortMovesQ(Board& board, MoveList* moves)
         vals[i] = ScoreMoveQ(board, moves->moves[i]);
     }
 
-    std::sort(vals, vals + moves->size, [](const MoveVal& a, const MoveVal& b) { return a.score > b.score; });
+    std::sort(vals, vals + moves->size, [](const MoveVal &a, const MoveVal &b)
+              { return a.score > b.score; });
 
     for (int i = 0; i < moves->size; i++)
     {
@@ -92,7 +140,28 @@ inline void SortMovesQ(Board& board, MoveList* moves)
     }
 }
 
-inline void SortMoves(Board& board, MoveList* moves)
+inline void SortMovesQ(Board &board, MoveList *moves, Move best)
+{
+    MoveVal vals[256];
+
+    for (int i = 0; i < moves->size; i++)
+    {
+        if (moves->moves[i] == best)
+            vals[i] = MoveVal(best, PV_BONUS);
+        else
+            vals[i] = ScoreMoveQ(board, moves->moves[i]);
+    }
+
+    std::sort(vals, vals + moves->size, [](const MoveVal &a, const MoveVal &b)
+              { return a.score > b.score; });
+
+    for (int i = 0; i < moves->size; i++)
+    {
+        moves->moves[i] = vals[i].m;
+    }
+}
+
+inline void SortMoves(Board &board, MoveList *moves)
 {
     MoveVal vals[256];
 
@@ -101,7 +170,8 @@ inline void SortMoves(Board& board, MoveList* moves)
         vals[i] = ScoreMove(board, moves->moves[i]);
     }
 
-    std::sort(vals, vals + moves->size, [](const MoveVal& a, const MoveVal& b) { return a.score > b.score; });
+    std::sort(vals, vals + moves->size, [](const MoveVal &a, const MoveVal &b)
+              { return a.score > b.score; });
 
     for (int i = 0; i < moves->size; i++)
     {
@@ -109,19 +179,20 @@ inline void SortMoves(Board& board, MoveList* moves)
     }
 }
 
-inline void SortMoves(Board& board, MoveList* moves, Move prev)
+inline void SortMoves(Board &board, MoveList *moves, Move prev)
 {
     MoveVal vals[256];
 
     for (int i = 0; i < moves->size; i++)
     {
-        if (prev.getMove() == moves->moves[i].getMove())
+        if (prev == moves->moves[i])
             vals[i] = MoveVal(prev, PV_BONUS);
         else
             vals[i] = ScoreMove(board, moves->moves[i]);
     }
 
-    std::sort(vals, vals + moves->size, [](const MoveVal& a, const MoveVal& b) { return a.score > b.score; });
+    std::sort(vals, vals + moves->size, [](const MoveVal &a, const MoveVal &b)
+              { return a.score > b.score; });
 
     for (int i = 0; i < moves->size; i++)
     {

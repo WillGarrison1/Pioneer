@@ -9,16 +9,17 @@
  */
 class Engine
 {
-  public:
+public:
     Engine();
     ~Engine();
 
     void print()
     {
         board->print();
+        board->getFen();
     }
 
-    void setFen(const std::string& fen)
+    void setFen(const std::string &fen)
     {
         board->setFen(fen);
     }
@@ -32,12 +33,13 @@ class Engine
     void undomove()
     {
         board->undoMove();
+        std::cout << board->getHash() << std::endl;
     }
 
     void isCheck(Move move);
 
-  private:
-    Board* board;
+private:
+    Board *board;
 };
 
 #endif

@@ -31,7 +31,7 @@ const Bitboard fileBBs[] =
         0x8080808080808080ULL};
 
 // Used for finding enemy attacks between castles
-const Bitboard castleBBs[CASTLE_BQ + 1] = {
+const Bitboard castleBBs[] = {
     0x0000000000000000ULL,
     0x0000000000000060ULL, // Short white
     0x000000000000000CULL, // Long white
@@ -68,17 +68,17 @@ constexpr Bitboard sqrToBB(const Square sq)
     return 1ULL << sq;
 }
 
-inline void setBit(Bitboard& bb, const Square sq)
+inline void setBit(Bitboard &bb, const Square sq)
 {
     bb |= 1ULL << sq;
 }
 
-inline void clearBit(Bitboard& bb, const Square sq)
+inline void clearBit(Bitboard &bb, const Square sq)
 {
     bb &= ~(1ULL << sq);
 }
 
-inline void toggleBit(Bitboard& bb, const Square sq)
+inline void toggleBit(Bitboard &bb, const Square sq)
 {
     bb ^= 1ULL << sq;
 }
@@ -88,7 +88,7 @@ inline bool getBit(const Bitboard bb, const Square sq)
     return bb & (1ULL << sq);
 }
 
-inline Square lsb(const Bitboard bb)
+constexpr Square lsb(const Bitboard bb)
 {
     assert(bb != 0);
 #if _MSC_VER
@@ -100,7 +100,7 @@ inline Square lsb(const Bitboard bb)
 #endif
 }
 
-inline Square msb(const Bitboard bb)
+constexpr Square msb(const Bitboard bb)
 {
     assert(bb != 0);
 #if _MSC_VER
@@ -112,14 +112,14 @@ inline Square msb(const Bitboard bb)
 #endif
 }
 
-inline Square popLSB(Bitboard& bb)
+inline Square popLSB(Bitboard &bb)
 {
     Square bit = lsb(bb);
     bb &= bb - 1;
     return bit;
 }
 
-inline int popCount(const Bitboard bb)
+constexpr int popCount(const Bitboard bb)
 {
 #if _MSC_VER
     return __popcnt64(bb);

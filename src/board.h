@@ -7,52 +7,45 @@
 #include "piece.h"
 #include "types.h"
 
+#define MAX_PLY 256
+
 static const std::string START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
 // Contains all the information about the current state of the board
 struct BoardState
 {
-    Square enPassantSquare;  // En passant square
+    char enPassantSquare;    // En passant square
     CastlingRights castling; // Castling rights
     Move move;               // Move that led to this board state
 
-    Bitboard pieceAttacks[64];   // the attacks that each piece has (except pawns)
-    Bitboard attacks[BLACK + 1]; // the attacks a side has
-    Bitboard checkBB;
+    Bitboard attacks[2]; // the attacks a side has (white = 0 black = 1)
 
-    unsigned int numChecks;
-    unsigned int ply; // Ply count
-    unsigned int move50rule;
-
+    unsigned char numChecks;
+    unsigned char move50rule;
     Score pawn_material;
     Score non_pawn_material;
 
     Key zobristHash;
 
-    BoardState* previous;
-
     BoardState();
     BoardState(BoardState *prev);
-    
 
     ~BoardState();
 };
 
 class Board
 {
-  public:
+public:
     Board();
     ~Board();
-
-    MoveList* generateMoves() const;
 
     void addPiece(Piece piece, Square square);
     void removePiece(Square square);
     void movePiece(Square from, Square to);
 
-    void addPieceZobrist(Piece piece, Square to, Key* key);  // moves the piece and updates the zobrist hash
-    void removePieceZobrist(Square from, Key* key);          // moves the piece and updates the zobrist hash
-    void movePieceZobrist(Square from, Square to, Key* key); // moves the piece and updates the zobrist hash
+    void addPieceZobrist(Piece piece, Square to, Key *key);
+    void removePieceZobrist(Square from, Key *key);
+    void movePieceZobrist(Square from, Square to, Key *key); // moves the piece and updates the zobrist hash
 
     void makeMove(Move move);
     void undoMove();
@@ -67,18 +60,17 @@ class Board
 
     void print() const;
 
-    void setFen(const std::string& fen);
+    void setFen(const std::string &fen);
     std::string getFen() const;
 
     // Clears bitboards and board
     void clear();
 
-    unsigned int generateAttackBB(Bitboard& checkBB, const Color side);
+    unsigned int generateAttackBB(Bitboard &checkBB, const Color side);
 
-    inline unsigned int generateEnemyAttacks(Bitboard& checkBB)
-    {
-        return state->numChecks = whiteToMove ? generateAttackBB(checkBB, BLACK) : generateAttackBB(checkBB, WHITE);
-    }
+    Bitboard computeAttackedBBs();
+
+    void computePins(Bitboard &pinnedS, Bitboard &pinnedD);
 
     // Move stuff
     constexpr Move createMove(Square from, Square to, MoveType mType = QUIET, PieceType promote = EMPTY,
@@ -95,7 +87,7 @@ class Board
         return pieceBB[piece];
     }
 
-    // Get bitboard for multiple piecetypes
+    // Get bitboard for multiple piecetypes (ripped from stockfish)
     template <typename... PieceTypes>
     inline Bitboard getBB(PieceType piece, PieceTypes... pieces) const
     {
@@ -130,22 +122,12 @@ class Board
     /**
      * @brief Returns the bitboard of attacked squared by the specified color
      *
-     * @param c
+     * @param c color
      * @return Bitboard
      */
     inline Bitboard getAttacked(Color c) const
     {
-        return state->attacks[c];
-    }
-    /**
-     * @brief Gets the attacks that a piece on a given square has
-     *
-     * @param s the square the piece is on
-     * @return Bitboard
-     */
-    inline Bitboard getPieceAttacks(Square s) const
-    {
-        return state->pieceAttacks[s];
+        return states[ply].attacks[c == BLACK];
     }
 
     /**
@@ -155,46 +137,55 @@ class Board
      */
     inline unsigned int getNumChecks() const
     {
-        return state->numChecks;
+        return states[ply].numChecks;
     }
 
     inline Square getEnPassantSqr() const
     {
-        return state->enPassantSquare;
+        return static_cast<Square>(states[ply].enPassantSquare);
     }
 
-    inline BoardState* getState() const
+    inline const BoardState *getState() const
     {
-        return state;
+        return &states[ply];
     }
 
     inline Score getPawnMaterial() const
     {
-        return state->pawn_material;
+        return states[ply].pawn_material;
     }
 
     inline Score getNonPawnMaterial() const
     {
-        return state->non_pawn_material;
+        return states[ply].non_pawn_material;
     }
 
     unsigned int getRepetition(); // gets the amount of times this position appeared on the board
 
-    inline Key getHash()
+    inline Key getHash() const
     {
-        return state->zobristHash;
+        return states[ply].zobristHash;
+    }
+
+    inline unsigned int getPly() const
+    {
+        return ply;
     }
 
     bool whiteToMove; // True if white is to move
     Color sideToMove; // Side to move
 
-  private:
+private:
+    unsigned char ply;
+
     Bitboard pieceBB[ALL_PIECES + 1]; // Bitboards for each piece type
     Bitboard colorBB[BLACK + 1];      // Bitboards for each color
 
     Piece board[64]; // Board representation
 
-    BoardState* state; // Current board state
+    BoardState states[MAX_PLY]; // Current board state
 };
+
+constexpr static int size = sizeof(Board);
 
 #endif

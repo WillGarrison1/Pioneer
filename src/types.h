@@ -88,7 +88,7 @@ constexpr File operator++(File& file, const int)
     return temp;
 }
 
-enum Direction : int
+enum Direction : char
 {
     NONE_DIR = 0,
     NORTH = 8,
@@ -101,7 +101,7 @@ enum Direction : int
     SOUTH_WEST = SOUTH + WEST
 };
 
-enum CastlingRights : unsigned int
+enum CastlingRights : unsigned char
 {
     NONE_CASTLE = 0,
     CASTLE_WK = 1,

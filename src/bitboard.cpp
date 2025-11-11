@@ -14,8 +14,8 @@ Bitboard bishopMasks[64];
 Bitboard bitboardPaths[64][64]; // bitboards with bits from one square to another (note that the start squares/first
                                 // index isn't included)
 Bitboard _bitboardRays[19][64] =
-    {}; // bitboards with bits starting from a certain square heading off the board (start square isn't included)
-const Bitboard (*bitboardRays)[64] = _bitboardRays + 9;
+    {};                                                 // bitboards with bits starting from a certain square heading off the board (start square isn't included)
+const Bitboard (*bitboardRays)[64] = _bitboardRays + 9; // offset pointer to array so negative directions can be used as an index
 
 Bitboard passedPawnBB[9][64];
 Bitboard isolatedPawnBB[64];
@@ -23,11 +23,15 @@ Bitboard isolatedPawnBB[64];
 void initBBs()
 {
 
-    constexpr Direction knightDirs[] = {NORTH + NORTH + EAST, NORTH + NORTH + WEST, SOUTH + SOUTH + EAST,
-                                        SOUTH + SOUTH + WEST, EAST + EAST + NORTH,  EAST + EAST + SOUTH,
-                                        WEST + WEST + NORTH,  WEST + WEST + SOUTH};
+    constexpr Direction knightDirs[] = {
+        NORTH + NORTH + EAST, NORTH + NORTH + WEST,
+        SOUTH + SOUTH + EAST, SOUTH + SOUTH + WEST,
+        EAST + EAST + NORTH, EAST + EAST + SOUTH,
+        WEST + WEST + NORTH, WEST + WEST + SOUTH};
 
-    constexpr Direction kingDirs[] = {NORTH, SOUTH, EAST, WEST, NORTH_EAST, NORTH_WEST, SOUTH_EAST, SOUTH_WEST};
+    constexpr Direction kingDirs[] = {
+        NORTH, SOUTH, EAST, WEST,
+        NORTH_EAST, NORTH_WEST, SOUTH_EAST, SOUTH_WEST};
 
     constexpr Direction pawnWAttackDirs[] = {NORTH_EAST, NORTH_WEST};
     constexpr Direction pawnBAttackDirs[] = {SOUTH_EAST, SOUTH_WEST};
@@ -37,6 +41,7 @@ void initBBs()
     // Initialize moves and attacks
     for (Square sqr = SQ_A1; sqr <= SQ_H8; sqr++)
     {
+        // Initialize knight moves for each square
         for (Direction dir : knightDirs)
         {
             Square to = sqr + dir;
@@ -44,6 +49,7 @@ void initBBs()
                 setBit(knightMoves[sqr], to);
         }
 
+        // Initialize king directions for each square
         for (Direction dir : kingDirs)
         {
             Square to = sqr + dir;
@@ -53,6 +59,7 @@ void initBBs()
                 setBit(kingMoves[sqr], to);
         }
 
+        // Initialize white pawn attacks for each square
         for (Direction dir : pawnWAttackDirs)
         {
             Square to = sqr + dir;
@@ -60,6 +67,7 @@ void initBBs()
                 setBit(pawnAttacks[WHITE][sqr], to);
         }
 
+        // Initialize black pawn attacks for each square
         for (Direction dir : pawnBAttackDirs)
         {
             Square to = sqr + dir;

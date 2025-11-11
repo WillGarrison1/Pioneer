@@ -3,6 +3,7 @@
 
 #include "types.h"
 #include <cmath>
+#include <string>
 
 // Gives the distance (no diagnals) to the edge of the board from a certain square
 // Where the the closest square to the edge is 0
@@ -51,26 +52,26 @@ constexpr Square operator-(const Square sq, const int offset)
     return static_cast<Square>(static_cast<int>(sq) - offset);
 }
 
-constexpr Square operator+=(Square& sq, const int offset)
+constexpr Square operator+=(Square &sq, const int offset)
 {
     sq = sq + offset;
     return sq;
 }
 
-constexpr Square operator-=(Square& sq, const int offset)
+constexpr Square operator-=(Square &sq, const int offset)
 {
     sq = sq - offset;
     return sq;
 }
 
-constexpr Square operator++(Square& sq, const int)
+constexpr Square operator++(Square &sq, const int)
 {
     Square temp = sq;
     sq = sq + 1;
     return temp;
 }
 
-constexpr Square operator--(Square& sq, const int)
+constexpr Square operator--(Square &sq, const int)
 {
     Square temp = sq;
     sq = sq - 1;
@@ -88,5 +89,6 @@ inline unsigned int manhattanDistance(const Square a, const Square b)
 }
 
 extern void initSquare();
+extern std::string sqrToString(Square s);
 
 #endif // SQUARE_H
