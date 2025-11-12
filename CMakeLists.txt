@@ -12,8 +12,8 @@ endif()
 file(GLOB_RECURSE SOURCES "src/*.cpp")
 
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
-    add_compile_options(-O3 -flto -march=native -mtune=native -mpopcnt -mlzcnt -fprofile-use)
-    add_link_options(-flto)
+    add_compile_options(-O3 -flto -march=native -mtune=native -mpopcnt -mlzcnt -mbmi2 -fprofile-generate)
+    add_link_options(-flto -fprofile-generate)
 endif()
 
 add_executable(PioneerV4 ${SOURCES})

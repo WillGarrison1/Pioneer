@@ -3,24 +3,24 @@
 
 #include "bitboard.h"
 #include "types.h"
+#include <immintrin.h>
 
 struct Magic
 {
-    Bitboard* moves;
-    Key magic;
-    unsigned char offset;
+    Bitboard *moves;
+    Bitboard mask;
 
-    Magic() : moves(nullptr), magic(0), offset(0)
+    Magic() : moves(nullptr), mask(0)
     {
     }
 
-    Magic(Key magicULL, unsigned char offset) : moves(nullptr), magic(magicULL), offset(offset)
+    Magic(Bitboard mask) : moves(nullptr), mask(mask)
     {
     }
 
     inline Bitboard GetMoves(Bitboard blockers)
     {
-        return moves[(magic * blockers) >> (64 - offset)];
+        return moves[_pext_u64(blockers, mask)];
     }
 };
 
@@ -33,12 +33,12 @@ void InitMagics();
 
 inline Bitboard GetRookMoves(Bitboard blockers, Square sqr)
 {
-    return rookMagics[sqr].GetMoves(blockers & rookMasks[sqr] & noEdgeMask[sqr] & ~sqrToBB(sqr));
+    return rookMagics[sqr].GetMoves(blockers);
 }
 
 inline Bitboard GetBishopMoves(Bitboard blockers, Square sqr)
 {
-    return bishopMagics[sqr].GetMoves(blockers & bishopMasks[sqr] & noEdgeMask[sqr] & ~sqrToBB(sqr));
+    return bishopMagics[sqr].GetMoves(blockers);
 }
 
 #endif
