@@ -8,8 +8,8 @@
 #include "color.h"
 #include "direction.h"
 #include "magic.h"
-#include "square.h"
 #include "profile.h"
+#include "square.h"
 
 struct MovegenMasks
 {
@@ -19,7 +19,7 @@ struct MovegenMasks
 };
 
 // Special pin detection for en passant
-Direction isPinned(const Board &board, Square s, Square enPassant)
+Direction isPinned(const Board& board, Square s, Square enPassant)
 {
     const Bitboard kingBB = board.getBB(board.sideToMove, KING);
     const Bitboard blockers = board.getBB(ALL_PIECES) & ~sqrToBB(enPassant);
@@ -60,7 +60,7 @@ Direction isPinned(const Board &board, Square s, Square enPassant)
 
 // Pawn move generation
 template <MoveType mType>
-void generatePawnMoves(const Board &board, MoveList *list, MovegenMasks *masks)
+void generatePawnMoves(const Board& board, MoveList* list, MovegenMasks* masks)
 {
     PROFILE_FUNC();
 
@@ -81,11 +81,21 @@ void generatePawnMoves(const Board &board, MoveList *list, MovegenMasks *masks)
     {
         Bitboard singlePushesUnpinned = shift(unpinnedPawnsS & ~masks->pinnedD, forward);
         Bitboard singlePushesPinned = shift(pinnedPawnsS & ~masks->pinnedD, forward) & masks->pinnedS;
-        Bitboard singlePushes = (singlePushesPinned | singlePushesUnpinned) & empty; // pawns can't move forward if pinned diagonally
+        Bitboard singlePushes =
+            (singlePushesPinned | singlePushesUnpinned) & empty; // pawns can't move forward if pinned diagonally
 
-        Bitboard doublePushes = shift(singlePushes, forward) & empty & (board.whiteToMove ? rankBBs[RANK_4] : rankBBs[RANK_5]);
+        Bitboard doublePushes =
+            shift(singlePushes, forward) & empty & (board.whiteToMove ? rankBBs[RANK_4] : rankBBs[RANK_5]);
         singlePushes &= masks->checkBB;
         doublePushes &= masks->checkBB;
+
+        while (doublePushes)
+        {
+            Square to = popLSB(doublePushes);
+            Square from = to - doubleForward;
+
+            list->addMove(board.createMove(from, to));
+        }
 
         while (singlePushes)
         {
@@ -103,17 +113,10 @@ void generatePawnMoves(const Board &board, MoveList *list, MovegenMasks *masks)
 
             list->addMove(board.createMove(from, to));
         }
-
-        while (doublePushes)
-        {
-            Square to = popLSB(doublePushes);
-            Square from = to - doubleForward;
-
-            list->addMove(board.createMove(from, to));
-        }
     }
 
-    Bitboard attacksWestPinned = shift(pinnedPawnsD & ~fileBBs[FILE_A] & ~masks->pinnedS, forward + WEST) & masks->pinnedD;
+    Bitboard attacksWestPinned =
+        shift(pinnedPawnsD & ~fileBBs[FILE_A] & ~masks->pinnedS, forward + WEST) & masks->pinnedD;
     Bitboard attacksWestUnpinned = shift(unpinnedPawnsD & ~fileBBs[FILE_A] & ~masks->pinnedS, forward + WEST);
 
     Bitboard attacksWest = (attacksWestPinned | attacksWestUnpinned) & enemy & masks->checkBB;
@@ -135,7 +138,8 @@ void generatePawnMoves(const Board &board, MoveList *list, MovegenMasks *masks)
         list->addMove(board.createMove(from, to, CAPTURE));
     }
 
-    Bitboard attacksEastPinned = shift(pinnedPawnsD & ~fileBBs[FILE_H] & ~masks->pinnedS, forward + EAST) & masks->pinnedD;
+    Bitboard attacksEastPinned =
+        shift(pinnedPawnsD & ~fileBBs[FILE_H] & ~masks->pinnedS, forward + EAST) & masks->pinnedD;
     Bitboard attacksEastUnpinned = shift(unpinnedPawnsD & ~fileBBs[FILE_H] & ~masks->pinnedS, forward + EAST);
 
     Bitboard attacksEast = (attacksEastPinned | attacksEastUnpinned) & enemy & masks->checkBB;
@@ -160,10 +164,10 @@ void generatePawnMoves(const Board &board, MoveList *list, MovegenMasks *masks)
     // En Passant
     if (board.getEnPassantSqr() != SQ_NONE)
     {
-        Bitboard attacksWest = shift(pawns & ~fileBBs[FILE_A], forward + WEST) &
-                               shift(masks->checkBB, forward) & sqrToBB(board.getEnPassantSqr());
-        Bitboard attacksEast = shift(pawns & ~fileBBs[FILE_H], forward + EAST) &
-                               shift(masks->checkBB, forward) & sqrToBB(board.getEnPassantSqr());
+        Bitboard attacksWest = shift(pawns & ~fileBBs[FILE_A], forward + WEST) & shift(masks->checkBB, forward) &
+                               sqrToBB(board.getEnPassantSqr());
+        Bitboard attacksEast = shift(pawns & ~fileBBs[FILE_H], forward + EAST) & shift(masks->checkBB, forward) &
+                               sqrToBB(board.getEnPassantSqr());
         Square enPassantAttacked = board.getEnPassantSqr() - forward;
         if (attacksEast)
         {
@@ -189,11 +193,12 @@ void generatePawnMoves(const Board &board, MoveList *list, MovegenMasks *masks)
 // Knight move generation
 
 template <MoveType mType>
-void generateKnightMoves(const Board &board, MoveList *list, MovegenMasks *masks)
+void generateKnightMoves(const Board& board, MoveList* list, MovegenMasks* masks)
 {
     PROFILE_FUNC();
 
-    Bitboard knights = board.getBB(board.sideToMove, KNIGHT) & ~(masks->pinnedS | masks->pinnedD); // doesn't matter which way the pin is
+    Bitboard knights = board.getBB(board.sideToMove, KNIGHT) &
+                       ~(masks->pinnedS | masks->pinnedD); // doesn't matter which way the pin is
     while (knights)
     {
         Square from = popLSB(knights);
@@ -218,7 +223,7 @@ void generateKnightMoves(const Board &board, MoveList *list, MovegenMasks *masks
 }
 
 template <MoveType mType>
-void generateBishopMoves(const Board &board, MoveList *list, MovegenMasks *masks)
+void generateBishopMoves(const Board& board, MoveList* list, MovegenMasks* masks)
 {
     PROFILE_FUNC();
 
@@ -244,7 +249,7 @@ void generateBishopMoves(const Board &board, MoveList *list, MovegenMasks *masks
 }
 
 template <MoveType mType>
-void generateRookMoves(const Board &board, MoveList *list, MovegenMasks *masks)
+void generateRookMoves(const Board& board, MoveList* list, MovegenMasks* masks)
 {
     PROFILE_FUNC();
     const Bitboard blockers = board.getBB(ALL_PIECES);
@@ -269,7 +274,7 @@ void generateRookMoves(const Board &board, MoveList *list, MovegenMasks *masks)
 }
 
 template <MoveType mType>
-void generateQueenMoves(const Board &board, MoveList *list, MovegenMasks *masks)
+void generateQueenMoves(const Board& board, MoveList* list, MovegenMasks* masks)
 {
     PROFILE_FUNC();
 
@@ -305,7 +310,7 @@ void generateQueenMoves(const Board &board, MoveList *list, MovegenMasks *masks)
 }
 
 template <MoveType mType>
-void generateKingMoves(const Board &board, MoveList *list)
+void generateKingMoves(const Board& board, MoveList* list)
 {
     PROFILE_FUNC();
     const Bitboard open = (mType == ALL_MOVES ? ~board.getBB(board.sideToMove) : board.getBB(~board.sideToMove)) &
@@ -320,7 +325,7 @@ void generateKingMoves(const Board &board, MoveList *list)
     }
 }
 
-void generateCastlingMoves(const Board &board, MoveList *list)
+void generateCastlingMoves(const Board& board, MoveList* list)
 {
     PROFILE_FUNC();
     const Bitboard blockers = board.getBB(ALL_PIECES);
@@ -337,9 +342,10 @@ void generateCastlingMoves(const Board &board, MoveList *list)
             list->addMove(board.createMove(SQ_E1, SQ_G1, CASTLE, EMPTY, CASTLE_WK));
         }
         // Long castle
-        if ((castleRights & CASTLE_WQ) &&                              // has castle right
-            ((open & castleBBs[CASTLE_WQ]) == castleBBs[CASTLE_WQ]) && // no attacked squares or pieces where king moves through
-            (blockers & sqrToBB(SQ_B1)) == 0ULL)                       // no piecce next to rook
+        if ((castleRights & CASTLE_WQ) && // has castle right
+            ((open & castleBBs[CASTLE_WQ]) ==
+             castleBBs[CASTLE_WQ]) &&            // no attacked squares or pieces where king moves through
+            (blockers & sqrToBB(SQ_B1)) == 0ULL) // no piecce next to rook
         {
             list->addMove(board.createMove(SQ_E1, SQ_C1, CASTLE, EMPTY, CASTLE_WQ));
         }
@@ -347,14 +353,12 @@ void generateCastlingMoves(const Board &board, MoveList *list)
     else
     {
         // Short castle
-        if ((castleRights & CASTLE_BK) &&
-            ((open & castleBBs[CASTLE_BK]) == castleBBs[CASTLE_BK]))
+        if ((castleRights & CASTLE_BK) && ((open & castleBBs[CASTLE_BK]) == castleBBs[CASTLE_BK]))
         {
             list->addMove(board.createMove(SQ_E8, SQ_G8, CASTLE, EMPTY, CASTLE_BK));
         }
         // Long castle
-        if ((castleRights & CASTLE_BQ) &&
-            ((open & castleBBs[CASTLE_BQ]) == castleBBs[CASTLE_BQ]) &&
+        if ((castleRights & CASTLE_BQ) && ((open & castleBBs[CASTLE_BQ]) == castleBBs[CASTLE_BQ]) &&
             (blockers & sqrToBB(SQ_B8)) == 0ULL)
         {
             list->addMove(board.createMove(SQ_E8, SQ_C8, CASTLE, EMPTY, CASTLE_BQ));
@@ -363,7 +367,7 @@ void generateCastlingMoves(const Board &board, MoveList *list)
 }
 
 template <MoveType type>
-void generateMoves(Board &board, MoveList *list)
+void generateMoves(Board& board, MoveList* list)
 {
     PROFILE_FUNC();
     assert(board.getBB(board.sideToMove, KING));
@@ -391,5 +395,5 @@ void generateMoves(Board &board, MoveList *list)
     generateKingMoves<type>(board, list);
 }
 
-template void generateMoves<ALL_MOVES>(Board &board, MoveList *list);
-template void generateMoves<CAPTURE>(Board &board, MoveList *list);
+template void generateMoves<ALL_MOVES>(Board& board, MoveList* list);
+template void generateMoves<CAPTURE>(Board& board, MoveList* list);

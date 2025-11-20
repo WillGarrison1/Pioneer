@@ -1,7 +1,7 @@
 #include <cassert>
+#include <cstring>
 #include <iostream>
 #include <sstream>
-#include <cstring>
 
 #include "bitboard.h"
 #include "board.h"
@@ -10,9 +10,9 @@
 #include "evaluate.h"
 #include "movegen.h"
 #include "piece.h"
+#include "profile.h"
 #include "square.h"
 #include "transposition.h"
-#include "profile.h"
 
 BoardState::BoardState()
 {
@@ -32,7 +32,7 @@ BoardState::BoardState()
     zobristHash = 0ULL;
 }
 
-BoardState::BoardState(BoardState *prev)
+BoardState::BoardState(BoardState* prev)
 {
     this->attacks[0] = 0ULL;
     this->attacks[1] = 0ULL;
@@ -107,7 +107,7 @@ void Board::movePiece(Square from, Square to)
     board[to] = piece;
 }
 
-void Board::addPieceZobrist(Piece piece, Square square, Key *key)
+void Board::addPieceZobrist(Piece piece, Square square, Key* key)
 {
     const PieceType pieceType = getType(piece);
     const Color color = getColor(piece);
@@ -120,7 +120,7 @@ void Board::addPieceZobrist(Piece piece, Square square, Key *key)
     board[square] = piece;
 }
 
-void Board::removePieceZobrist(Square square, Key *key)
+void Board::removePieceZobrist(Square square, Key* key)
 {
     const Piece piece = board[square];
     const PieceType pieceType = getType(piece);
@@ -134,7 +134,7 @@ void Board::removePieceZobrist(Square square, Key *key)
     board[square] = EMPTY;
 }
 
-void Board::movePieceZobrist(Square from, Square to, Key *key)
+void Board::movePieceZobrist(Square from, Square to, Key* key)
 {
     const Piece piece = board[from];
     const PieceType pieceType = getType(piece);
@@ -157,8 +157,8 @@ void Board::makeMove(Move move)
     PROFILE_FUNC();
 
     // Initialize new board state
-    BoardState *state = &this->states[ply];
-    BoardState *newState = &this->states[ply + 1];
+    BoardState* state = &this->states[ply];
+    BoardState* newState = &this->states[ply + 1];
 
     newState->attacks[0] = 0ULL;
     newState->attacks[1] = 0ULL;
@@ -403,8 +403,8 @@ void Board::undoMove()
 
 void Board::makeNullMove()
 {
-    BoardState *state = &this->states[ply++];
-    BoardState *newState = &this->states[ply];
+    BoardState* state = &this->states[ply++];
+    BoardState* newState = &this->states[ply];
 
     *newState = *state;
 
@@ -435,13 +435,13 @@ void Board::undoNullMove()
 
 unsigned int Board::getRepetition()
 {
-    BoardState *currState = &states[ply];
+    BoardState* currState = &states[ply];
     Key zobrist = currState->zobristHash;
 
     unsigned int repetitions = 1;
     for (int i = ply; i > 0; --i)
     {
-        BoardState *currState = &this->states[i];
+        BoardState* currState = &this->states[i];
         if (currState->move.captured() || getType(currState->move.piece()) == PAWN ||
             currState->move.castleRights()) // if irreversable changes made, then break
             break;
@@ -500,7 +500,7 @@ void Board::clear()
     }
 }
 
-void Board::setFen(const std::string &fen)
+void Board::setFen(const std::string& fen)
 {
     clear();
 
@@ -594,7 +594,7 @@ void Board::setFen(const std::string &fen)
 }
 
 // Updates attacked bitboard and returns number of checks of the opposing king
-unsigned int Board::generateAttackBB(Bitboard &checkBB, const Color side)
+unsigned int Board::generateAttackBB(Bitboard& checkBB, const Color side)
 {
     PROFILE_FUNC();
     const Direction forward = side == WHITE ? NORTH : SOUTH;
@@ -608,17 +608,19 @@ unsigned int Board::generateAttackBB(Bitboard &checkBB, const Color side)
     Bitboard queens = getBB(side, QUEEN);
 
     unsigned int checkCount = 0;
-    states[ply].attacks[side == 8] = 0ULL;
+    Bitboard attackBB = 0;
 
     checkBB = -1ULL;
 
-    states[ply].attacks[side == 8] |= shift(pawns & ~fileBBs[FILE_A], forward + WEST);
-    states[ply].attacks[side == 8] |= shift(pawns & ~fileBBs[FILE_H], forward + EAST);
+    attackBB |= shift(pawns & ~fileBBs[FILE_A], forward + WEST);
+    attackBB |= shift(pawns & ~fileBBs[FILE_H], forward + EAST);
 
-    if (states[ply].attacks[side == 8] & enemyKing)
+    Square enemyKingSqr = lsb(enemyKing);
+
+    if (__builtin_expect((attackBB & enemyKing) != 0, 0))
     {
         // Should be our side to move to reverse attack move
-        checkBB = pawnAttacks[~side][lsb(enemyKing)] & pawns;
+        checkBB = pawnAttacks[~side][enemyKingSqr] & pawns;
         checkCount++;
     }
 
@@ -626,37 +628,37 @@ unsigned int Board::generateAttackBB(Bitboard &checkBB, const Color side)
     {
         Square from = popLSB(knights);
         Bitboard moves = knightMoves[from];
-        if (moves & enemyKing)
+        if (__builtin_expect((moves & enemyKing) != 0, 0))
         { // Knight checks king
             checkBB = sqrToBB(from);
             checkCount++;
         }
-        states[ply].attacks[side == 8] |= moves;
+        attackBB |= moves;
     }
 
     while (bishops)
     {
         Square from = popLSB(bishops);
         Bitboard moves = GetBishopMoves(blockers, from);
-        if (moves & enemyKing)
+        if (__builtin_expect((moves & enemyKing) != 0, 0))
         {
-            checkBB = sqrToBB(from) | bitboardPaths[from][lsb(enemyKing)];
+            checkBB = sqrToBB(from) | bitboardPaths[from][enemyKingSqr];
             checkCount++;
         }
 
-        states[ply].attacks[side == 8] |= moves;
+        attackBB |= moves;
     }
 
     while (rooks)
     {
         Square from = popLSB(rooks);
         Bitboard moves = GetRookMoves(blockers, from);
-        if (moves & enemyKing)
+        if (__builtin_expect((moves & enemyKing) != 0, 0))
         {
-            checkBB = sqrToBB(from) | bitboardPaths[from][lsb(enemyKing)];
+            checkBB = sqrToBB(from) | bitboardPaths[from][enemyKingSqr];
             checkCount++;
         }
-        states[ply].attacks[side == 8] |= moves;
+        attackBB |= moves;
     }
 
     while (queens)
@@ -664,16 +666,18 @@ unsigned int Board::generateAttackBB(Bitboard &checkBB, const Color side)
         Square from = popLSB(queens);
         Bitboard moves = GetRookMoves(blockers, from) | GetBishopMoves(blockers, from);
 
-        if (moves & enemyKing)
+        if (__builtin_expect((moves & enemyKing) != 0, 0))
         {
-            checkBB = sqrToBB(from) | bitboardPaths[from][lsb(enemyKing)];
+            checkBB = sqrToBB(from) | bitboardPaths[from][enemyKingSqr];
             checkCount++;
         }
-        states[ply].attacks[side == 8] |= moves;
+        attackBB |= moves;
     }
 
     Square king = lsb(getBB(side, KING));
-    states[ply].attacks[side == 8] |= kingMoves[king];
+    attackBB |= kingMoves[king];
+
+    states[ply].attacks[side == 8] = attackBB;
 
     return checkCount;
 }
@@ -690,7 +694,7 @@ Bitboard Board::computeAttackedBBs()
     return checkBB;
 }
 
-void Board::computePins(Bitboard &pinnedS, Bitboard &pinnedD)
+void Board::computePins(Bitboard& pinnedS, Bitboard& pinnedD)
 {
     pinnedS = pinnedD = 0ULL;
 
