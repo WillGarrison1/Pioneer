@@ -8,18 +8,15 @@
 #include <iostream>
 #include <windows.h>
 
-Bitboard _rookBlockers[64][4096];
-Bitboard _bishopBlockers[64][512];
-
 Bitboard noEdgeMask[64];
 
 Bitboard *slidingMoves;
 
 // Rook magic (800kb)
-Magic rookMagics[64];
+alignas(64) Magic rookMagics[64];
 
 // Bishop magics (41kb)
-Magic bishopMagics[64];
+alignas(64) Magic bishopMagics[64];
 
 Bitboard getBlockers(Bitboard mask, unsigned int number)
 {
@@ -155,7 +152,7 @@ void InitMagics()
 
     std::cout << "Rook magic size: " << (unsigned long long)((float)rookSize / 1024.0f * 8.0f) << "kb" << std::endl;
 
-    slidingMoves = new Bitboard[rookSize + bishopSize];
+    slidingMoves = new (std::align_val_t(64)) Bitboard[rookSize + bishopSize];
 
     GenerateBishopMoves(slidingMoves + rookSize, bishopSize);
     GenerateRookMoves(slidingMoves, rookSize);

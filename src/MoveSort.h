@@ -9,14 +9,19 @@
 
 #include <algorithm>
 
-#define CAPTURE_BONUS 5000
+#define CAPTURE_BONUS 4000
 #define PROMOTION_BONUS 4000
+
+#define MVV_LVA_VICTIM_MULTI 3
+#define MVV_LVA_ATTACKER_MULTI_GOOD 1
+#define MVV_LVA_ATTACKER_MULTI_BAD 5
+
 #define DEFENDED_BONUS 25
 #define ATTACKED_PENALTY -35
+
 #define PV_BONUS 30000
 #define KILLER_MOVE_BONUS 3000
-#define MAX_HISTORY 500
-#define CHECK_BONUS 20
+#define MAX_HISTORY 1000
 
 struct MoveVal
 {
@@ -60,9 +65,15 @@ inline void addHistoryPenalty(bool isBlack, Move m, int depth)
     moveHistory[isBlack][m.from()][m.to()] -= penalty + moveHistory[isBlack][m.from()][m.to()] * std::abs(penalty) / MAX_HISTORY;
 }
 
-inline Score Mvv_Lva_Score(PieceType victim, PieceType attacker)
+inline Score Mvv_Lva_Score(Board &board, Move m)
 {
-    return pieceScores[victim] - (pieceScores[attacker] >> 3);
+    Bitboard attacked = board.getAttacked(~board.sideToMove);
+    bool isVictimDefended = (sqrToBB(m.to()) & attacked) != 0;
+
+    return (pieceScores[getType(m.captured())] * MVV_LVA_VICTIM_MULTI - pieceScores[getType(m.piece())]) *
+           (isVictimDefended
+                ? MVV_LVA_ATTACKER_MULTI_BAD
+                : MVV_LVA_ATTACKER_MULTI_GOOD);
 }
 
 inline MoveVal ScoreMove(Board &board, Move m)
@@ -75,7 +86,9 @@ inline MoveVal ScoreMove(Board &board, Move m)
         v.score += KILLER_MOVE_BONUS;
 
     if (m.type() & CAPTURE) // bonus for captures
-        v.score += Mvv_Lva_Score(getType(m.captured()), getType(m.piece())) + CAPTURE_BONUS;
+    {
+        v.score += Mvv_Lva_Score(board, m) + CAPTURE_BONUS;
+    }
 
     if (m.type() & PROMOTION) // bonus for promotions
         v.score += pieceScores[getType(m.promotion())] + PROMOTION_BONUS;
@@ -83,8 +96,8 @@ inline MoveVal ScoreMove(Board &board, Move m)
     if (m.isType<QUIET>())
         v.score += moveHistory[board.sideToMove == BLACK][m.from()][m.to()];
 
-    // if (sqrToBB(m.to()) & board.getAttacked(~us)) // penalty for moving piece to attacked square
-    //     v.score += ATTACKED_PENALTY - pieceScores[getType(m.piece())] >> 5;
+    if (sqrToBB(m.to()) & board.getAttacked(~us)) // penalty for moving piece to attacked square
+        v.score += (ATTACKED_PENALTY - pieceScores[getType(m.piece())]) >> 1;
 
     // if (sqrToBB(m.to()) & board.getAttacked(us)) // bonus for moving piece to defended square
     //     v.score += DEFENDED_BONUS + pieceScores[getType(m.piece())] >> 5;
@@ -98,11 +111,9 @@ inline MoveVal ScoreMove(Board &board, Move m)
 
 inline MoveVal ScoreMoveQ(Board &board, Move m)
 {
-    const Color us = getColor(m.piece());
-
     MoveVal v(m, 0);
 
-    v.score += Mvv_Lva_Score(getType(m.captured()), getType(m.piece()));
+    v.score += Mvv_Lva_Score(board, m);
 
     if (m.type() & PROMOTION) // bonus for promotions
         v.score += pieceScores[getType(m.promotion())] + PROMOTION_BONUS;
@@ -124,7 +135,7 @@ inline MoveVal ScoreMoveQ(Board &board, Move m)
  */
 inline void SortMovesQ(Board &board, MoveList *moves)
 {
-    MoveVal vals[256];
+    MoveVal vals[moves->size];
 
     for (int i = 0; i < moves->size; i++)
     {

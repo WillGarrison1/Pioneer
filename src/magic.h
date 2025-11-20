@@ -24,8 +24,6 @@ struct Magic
     }
 };
 
-extern Bitboard noEdgeMask[64];
-
 extern Magic rookMagics[64];
 extern Magic bishopMagics[64];
 

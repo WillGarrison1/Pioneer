@@ -50,6 +50,9 @@ public:
     void makeMove(Move move);
     void undoMove();
 
+    void makeNullMove();
+    void undoNullMove();
+
     /**
      * @brief checks if a move causes check
      *

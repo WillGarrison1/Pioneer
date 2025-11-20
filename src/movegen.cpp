@@ -323,7 +323,6 @@ void generateKingMoves(const Board &board, MoveList *list)
 void generateCastlingMoves(const Board &board, MoveList *list)
 {
     PROFILE_FUNC();
-    const Square king = lsb(board.getBB(board.sideToMove, KING));
     const Bitboard blockers = board.getBB(ALL_PIECES);
     const CastlingRights castleRights = board.getState()->castling;
 

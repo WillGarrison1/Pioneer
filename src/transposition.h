@@ -6,7 +6,7 @@
 
 #define BUCKET_SIZE 3
 
-enum class NodeType : unsigned char
+enum class NodeBound : unsigned char
 {
     Exact,
     Upper,
@@ -15,11 +15,11 @@ enum class NodeType : unsigned char
 
 struct TranspositionEntry
 {
-    unsigned int key; // the upper 16 bits of the zobrist hash
-    Score score;      // The score of this position at depth
-    Move move;        // best move to be played
+    Key key;     // the upper 16 bits of the zobrist hash
+    Score score; // The score of this position at depth
+    Move move;   // best move to be played
 
-    NodeType nodeType;   // the bounds of this positions score
+    NodeBound bound;  // the bounds of this positions score
     unsigned char depth; // the depth the score was calculated at
     unsigned char age;   // the ply at which this position is
 };
@@ -43,7 +43,7 @@ public:
 
     TranspositionEntry *GetEntry(Key key);
 
-    void SetEntry(Key zobrist, Score score, unsigned char depth, NodeType nodeType, unsigned char ply, Move bestMove);
+    void SetEntry(Key zobrist, Score score, unsigned char depth, NodeBound bound, unsigned char ply, Move bestMove);
 
     float GetFull(); // gets how full the table is, from 0-1
 

@@ -6,6 +6,11 @@
 #include "movegen.h"
 #include "types.h"
 
+enum NodeType
+{
+    PVNode,
+    CUTNode,
+};
 
 /**
  * @brief Searches for the best chess move
@@ -16,6 +21,6 @@
  * @param movetime how many milliseconds to take when searching (if zero then infinite)
  * @return The best move
  */
-extern Move startSearch(Board& board, unsigned int depth, unsigned int nodes, unsigned int movetime);
+extern Move startSearch(Board &board, unsigned int depth, unsigned int nodes, unsigned int movetime);
 
 #endif

@@ -9,7 +9,7 @@ ProfileManager *GetManager()
     return &manager;
 }
 
-FunctionEntry::FunctionEntry(ProfileManager *manager, std::string name) : funcName(name), count(0), time(0), manager(manager)
+FunctionEntry::FunctionEntry(ProfileManager *manager, std::string name) : count(0), time(0), funcName(name), manager(manager)
 {
 }
 

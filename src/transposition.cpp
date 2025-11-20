@@ -30,12 +30,12 @@ TranspositionEntry *TranspositionTable::GetEntry(Key key)
     TranspositionBucket *bucket = &this->buckets[index];
 
     for (TranspositionEntry &entry : bucket->entries)
-        if (entry.key == key >> 32)
+        if (entry.key == key)
             return &entry;
     return nullptr;
 }
 
-void TranspositionTable::SetEntry(Key zobrist, Score score, unsigned char depth, NodeType nodeType, unsigned char ply,
+void TranspositionTable::SetEntry(Key zobrist, Score score, unsigned char depth, NodeBound bound, unsigned char ply,
                                   Move bestMove)
 {
     unsigned long long index = zobrist & (this->numBuckets - 1); // much faster than modulo
@@ -64,10 +64,10 @@ void TranspositionTable::SetEntry(Key zobrist, Score score, unsigned char depth,
         }
     }
 
-    entry->key = zobrist >> 32;
+    entry->key = zobrist;
     entry->score = score;
     entry->depth = depth;
-    entry->nodeType = nodeType;
+    entry->bound = bound;
     entry->age = ply;
     entry->move = bestMove;
 }

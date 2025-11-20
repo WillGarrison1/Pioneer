@@ -5,15 +5,15 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    add_compile_options(-g)
+    add_compile_options(-g -mbmi2)
 endif()
 
 
 file(GLOB_RECURSE SOURCES "src/*.cpp")
 
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
-    add_compile_options(-O3 -flto -march=native -mtune=native -mpopcnt -mlzcnt -mbmi2 -fprofile-generate)
-    add_link_options(-flto -fprofile-generate)
+    add_compile_options(-O3 -march=native -mtune=native -flto -fprofile-use)
+    add_link_options(-flto -fprofile-use)
 endif()
 
 add_executable(PioneerV4 ${SOURCES})

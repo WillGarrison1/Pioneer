@@ -5,20 +5,20 @@
 #include "direction.h"
 #include "square.h"
 
-Bitboard knightMoves[64];
-Bitboard kingMoves[64];
-Bitboard pawnAttacks[9][64];
-Bitboard pawnMoves[9][64];
-Bitboard rookMasks[64];
-Bitboard bishopMasks[64];
-Bitboard bitboardPaths[64][64]; // bitboards with bits from one square to another (note that the start squares/first
-                                // index isn't included)
-Bitboard _bitboardRays[19][64] =
+alignas(64) Bitboard knightMoves[64];
+alignas(64) Bitboard kingMoves[64];
+alignas(64) Bitboard pawnAttacks[9][64];
+alignas(64) Bitboard pawnMoves[9][64];
+alignas(64) Bitboard rookMasks[64];
+alignas(64) Bitboard bishopMasks[64];
+alignas(64) Bitboard bitboardPaths[64][64]; // bitboards with bits from one square to another (note that the start squares/first
+                                            // index isn't included)
+alignas(64) Bitboard _bitboardRays[19][64] =
     {};                                                 // bitboards with bits starting from a certain square heading off the board (start square isn't included)
 const Bitboard (*bitboardRays)[64] = _bitboardRays + 9; // offset pointer to array so negative directions can be used as an index
 
-Bitboard passedPawnBB[9][64];
-Bitboard isolatedPawnBB[64];
+alignas(64) Bitboard passedPawnBB[9][64];
+alignas(64) Bitboard isolatedPawnBB[64];
 
 void initBBs()
 {

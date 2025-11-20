@@ -53,7 +53,10 @@ BoardState::~BoardState()
 
 Board::Board()
 {
-    std::memset(states, 0, sizeof(states));
+    // Value-initialize each BoardState instead of using memset on non-trivial types.
+    const size_t stateCount = sizeof(states) / sizeof(states[0]);
+    for (size_t i = 0; i < stateCount; ++i)
+        states[i] = BoardState();
 
     whiteToMove = true;
     sideToMove = WHITE;
@@ -368,11 +371,9 @@ void Board::undoMove()
         Square to = move.to();
 
         Piece piece = move.piece();
-        PieceType pieceType = getType(piece);
         Color color = getColor(piece);
 
         Piece captured = move.captured();
-        Color capturedColor = getColor(captured);
 
         // Set Piece BBs
         movePiece(to, from);
@@ -398,6 +399,38 @@ void Board::undoMove()
     // Sync all-piece bb
     pieceBB[ALL_PIECES] = colorBB[WHITE] | colorBB[BLACK];
     pieceBB[EMPTY] = ~pieceBB[ALL_PIECES];
+}
+
+void Board::makeNullMove()
+{
+    BoardState *state = &this->states[ply++];
+    BoardState *newState = &this->states[ply];
+
+    *newState = *state;
+
+    newState->attacks[0] = 0ULL;
+    newState->attacks[1] = 0ULL;
+
+    newState->move = 0;
+    newState->numChecks = 0;
+
+    newState->enPassantSquare = SQ_NONE; //* note: only set if en passant can be played
+    newState->move50rule++;
+
+    if (state->enPassantSquare != SQ_NONE) // if enPassant square from last move, remove it from zobrist
+        newState->zobristHash ^= enPassantHash[getFile(getEnPassantSqr())];
+
+    whiteToMove = !whiteToMove;
+    sideToMove = ~sideToMove;
+
+    newState->zobristHash ^= isBlackHash;
+}
+
+void Board::undoNullMove()
+{
+    ply--;
+    whiteToMove = !whiteToMove;
+    sideToMove = ~sideToMove;
 }
 
 unsigned int Board::getRepetition()
@@ -448,7 +481,7 @@ void Board::print() const
 void Board::clear()
 {
     // Clear piece BBs
-    for (int i = 0; i <= ALL_PIECES; i++)
+    for (int i = 0; i <= static_cast<int>(ALL_PIECES); i++)
     {
         pieceBB[i] = 0;
     }
