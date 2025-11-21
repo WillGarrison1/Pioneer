@@ -37,20 +37,22 @@ Score EvalPiece(const Board &board)
 
     Square piece;
 
+    score += popCount(pieceW & defendedW) * DEFENDED_BONUS;
+    score += popCount(pieceW & defendedB) * ATTACKED_PENALTY;
+
+    score -= popCount(pieceB & defendedB) * DEFENDED_BONUS;
+    score -= popCount(pieceB & defendedW) * ATTACKED_PENALTY;
+
     while (pieceW)
     {
         piece = popLSB(pieceW);
         score += GetPSQValue<P, WHITE>(piece);
-        score += defendedW & sqrToBB(piece) ? DEFENDED_BONUS + P : 0;
-        score += defendedB & sqrToBB(piece) ? ATTACKED_PENALTY + P : 0;
     }
 
     while (pieceB)
     {
         piece = popLSB(pieceB);
         score -= GetPSQValue<P, BLACK>(piece);
-        score -= defendedB & sqrToBB(piece) ? DEFENDED_BONUS + P : 0;
-        score -= defendedW & sqrToBB(piece) ? ATTACKED_PENALTY + P : 0;
     }
 
     return score;
@@ -109,31 +111,36 @@ Score EvalPiece<PAWN>(const Board &board)
 
     Square piece;
 
+    score += popCount(pawnWAll & defendedW) * DEFENDED_BONUS;
+    score += popCount(pawnWAll & defendedB) * ATTACKED_PENALTY;
+
+    score -= popCount(pawnBAll & defendedB) * DEFENDED_BONUS;
+    score -= popCount(pawnBAll & defendedW) * ATTACKED_PENALTY;
+
     while (pawnW)
     {
         piece = popLSB(pawnW);
         score += GetPSQValue<PAWN, WHITE>(piece);
-        score += defendedW & sqrToBB(piece) ? DEFENDED_BONUS : 0;
-        score += defendedB & sqrToBB(piece) ? ATTACKED_PENALTY : 0;
 
         bool passedPawn = !(passedPawnBB[WHITE][piece] & pawnBAll);
         bool isolatedPawn = !(isolatedPawnBB[piece] & pawnWAll);
 
         if (passedPawn)
-            score += PASSED_PAWN_BONUS +
-                     20 * (getRank(piece) -
-                           1); // bonus for passed pawns and extra for the rank it's on (to encorage pushing)
+            score +=
+                PASSED_PAWN_BONUS +
+                20 *
+                    (6 - getRank(piece)); // bonus for passed pawns and extra for the rank it's on (to encorage pushing)
         if (isolatedPawn)
             score += passedPawn ? ISOLATED_PAWN_PENALTY >> 1
                                 : ISOLATED_PAWN_PENALTY; // halve isolated penalty if also a passed pawn
+
     }
 
     while (pawnB)
     {
         piece = popLSB(pawnB);
         score -= GetPSQValue<PAWN, BLACK>(piece);
-        score -= defendedB & sqrToBB(piece) ? DEFENDED_BONUS : 0;
-        score -= defendedW & sqrToBB(piece) ? ATTACKED_PENALTY : 0;
+        
 
         bool passedPawn = !(passedPawnBB[BLACK][piece] & pawnWAll);
         bool isolatedPawn = !(isolatedPawnBB[piece] & pawnBAll);
@@ -148,10 +155,11 @@ Score EvalPiece<PAWN>(const Board &board)
                                 : ISOLATED_PAWN_PENALTY; // halve isolated penalty if also a passed pawn
     }
 
+
     return score;
 }
 
-Score Eval(Board &board)
+Score Eval(const Board &board)
 {
     PROFILE_FUNC();
 

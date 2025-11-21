@@ -4,11 +4,11 @@
 
 #include "search.h"
 
-#include "time.h"
 #include "MoveSort.h"
 #include "evaluate.h"
-#include "transposition.h"
 #include "profile.h"
+#include "time.h"
+#include "transposition.h"
 
 #define INF 1000000
 #define MATE 100000
@@ -29,8 +29,8 @@ unsigned long long ttHits;
 unsigned long long maxNodes;
 unsigned long long maxTime;
 unsigned long long startTime;
-static TranspositionTable *tTable =
-    new TranspositionTable(1024 * 1024 * 512); // transposition table with a size of 64 MB
+static TranspositionTable* tTable =
+    new (std::align_val_t(64)) TranspositionTable(1024 * 1024 * 64); // transposition table with a size of 64 MB
 
 bool isDone;
 
@@ -47,7 +47,7 @@ struct PVLine
 Score bestScore = -INF;
 Move bestMove = 0;
 
-std::string GetMoveListString(PVLine *l)
+std::string GetMoveListString(PVLine* l)
 {
     std::string moves;
     for (int i = 0; i < l->len; i++)
@@ -58,14 +58,14 @@ std::string GetMoveListString(PVLine *l)
     return moves;
 }
 
-Score qsearch(Board &board, int ply, Score alpha, Score beta)
+Score qsearch(Board& board, int ply, Score alpha, Score beta)
 {
     PROFILE_FUNC();
     numQNodes++;
 
     // probe tt
 
-    TranspositionEntry *entry = tTable->GetEntry(board.getHash());
+    TranspositionEntry* entry = tTable->GetEntry(board.getHash());
     Move bestEntryMove = 0;
     if (entry && entry->depth >= 0)
     {
@@ -156,7 +156,7 @@ Score qsearch(Board &board, int ply, Score alpha, Score beta)
 }
 
 template <NodeType node>
-Score search(Board &board, int depth, int ply, Score alpha, Score beta, PVLine *prevLine)
+Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* prevLine)
 {
     if (isDone)
         return 0;
@@ -183,7 +183,7 @@ Score search(Board &board, int depth, int ply, Score alpha, Score beta, PVLine *
 
     constexpr bool isPVNode = node == PVNode;
 
-    TranspositionEntry *entry = tTable->GetEntry(board.getHash());
+    TranspositionEntry* entry = tTable->GetEntry(board.getHash());
 
     Move bestEntryMove = 0;
 
@@ -349,7 +349,7 @@ Score search(Board &board, int depth, int ply, Score alpha, Score beta, PVLine *
     return bestS;
 }
 
-Score iterativeDeepening(Board &board, unsigned int depth, unsigned int nodes, unsigned int movetime)
+Score iterativeDeepening(Board& board, unsigned int depth, unsigned int nodes, unsigned int movetime)
 {
     startTime = getTime();
 
@@ -417,8 +417,10 @@ Score iterativeDeepening(Board &board, unsigned int depth, unsigned int nodes, u
         }
 
         std::cout << "info depth " << d << " curmov " << bestMove.toString() << " score cp " << bestScore << " nodes "
-                  << numNodes + numQNodes << " pv " << GetMoveListString(&pv) << "hashfull " << (int)(tTable->GetFull() * 1000)
-                  << " time " << getTime() - startTime << " TTHitRate " << (float)ttHits / (float)numNodes << " BetaCutRate " << (float)numBetaCutoffs / (float)numNodes << " pv " << std::endl;
+                  << numNodes + numQNodes << " pv " << GetMoveListString(&pv) << "hashfull "
+                  << (int)(tTable->GetFull() * 1000) << " time " << getTime() - startTime << " TTHitRate "
+                  << (float)ttHits / (float)numNodes << " BetaCutRate " << (float)numBetaCutoffs / (float)numNodes
+                  << " pv " << std::endl;
 
         prevBestMove = bestMove;
         prevBestScore = bestScore;
@@ -427,7 +429,7 @@ Score iterativeDeepening(Board &board, unsigned int depth, unsigned int nodes, u
     return bestScore;
 }
 
-Move startSearch(Board &board, unsigned int depth, unsigned int nodes, unsigned int movetime)
+Move startSearch(Board& board, unsigned int depth, unsigned int nodes, unsigned int movetime)
 {
     isDone = false;
 

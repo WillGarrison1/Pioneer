@@ -1,6 +1,7 @@
 #include <chrono>
 #include <iostream>
 
+#include "MoveSort.h"
 #include "direction.h"
 #include "engine.h"
 #include "evaluate.h"
@@ -9,7 +10,6 @@
 #include "perft.h"
 #include "search.h"
 #include "square.h"
-#include "MoveSort.h"
 #include "time.h"
 #include "transposition.h"
 #include <cstring>

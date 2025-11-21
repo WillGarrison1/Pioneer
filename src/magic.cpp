@@ -6,7 +6,7 @@
 #include "time.h"
 #include <fstream>
 #include <iostream>
-#include <windows.h>
+#include <cstring>
 
 Bitboard noEdgeMask[64];
 

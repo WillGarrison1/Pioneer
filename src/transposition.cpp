@@ -11,10 +11,11 @@ Key enPassantHash[8];
 TranspositionTable::TranspositionTable(unsigned long long size)
 {
     assert(size != 0);
-    this->numBuckets = 1ULL << (63 - __builtin_clzll(size / sizeof(TranspositionBucket))); // round down to nearest power of two
+    this->numBuckets =
+        1ULL << (63 - __builtin_clzll(size / sizeof(TranspositionBucket))); // round down to nearest power of two
     std::cout << "Num Buckets: " << this->numBuckets << std::endl;
 
-    this->buckets = new TranspositionBucket[numBuckets];
+    this->buckets = new (std::align_val_t(64)) TranspositionBucket[numBuckets];
 
     memset(buckets, 0, numBuckets * sizeof(TranspositionBucket));
 }
@@ -24,27 +25,30 @@ TranspositionTable::~TranspositionTable()
     delete[] buckets;
 }
 
-TranspositionEntry *TranspositionTable::GetEntry(Key key)
+TranspositionEntry* TranspositionTable::GetEntry(Key key)
 {
     unsigned long long index = key & (this->numBuckets - 1);
-    TranspositionBucket *bucket = &this->buckets[index];
+    TranspositionBucket* bucket = &this->buckets[index];
+    unsigned short intKey = key >> 48;
 
-    for (TranspositionEntry &entry : bucket->entries)
-        if (entry.key == key)
-            return &entry;
-    return nullptr;
+    TranspositionEntry* result = nullptr;
+
+    for (TranspositionEntry* entry = bucket->entries; entry < bucket->entries + BUCKET_SIZE; entry++)
+        if (entry->key == intKey)
+            result = entry;
+    return result;
 }
 
 void TranspositionTable::SetEntry(Key zobrist, Score score, unsigned char depth, NodeBound bound, unsigned char ply,
                                   Move bestMove)
 {
     unsigned long long index = zobrist & (this->numBuckets - 1); // much faster than modulo
-    TranspositionBucket *bucket = &this->buckets[index];
+    TranspositionBucket* bucket = &this->buckets[index];
 
-    TranspositionEntry *entry = nullptr;
-    int maxPoints = INT_MIN;
+    TranspositionEntry* entry = nullptr;
+    int maxPoints = -__INT32_MAX__;
 
-    for (TranspositionEntry &e : bucket->entries)
+    for (TranspositionEntry& e : bucket->entries)
     {
         if (!e.key) // just fill entry if empty
         {
@@ -64,7 +68,7 @@ void TranspositionTable::SetEntry(Key zobrist, Score score, unsigned char depth,
         }
     }
 
-    entry->key = zobrist;
+    entry->key = zobrist >> 48;
     entry->score = score;
     entry->depth = depth;
     entry->bound = bound;
@@ -77,7 +81,7 @@ float TranspositionTable::GetFull()
     unsigned long long valid = 0;
     for (unsigned long long i = 0; i < this->numBuckets; i++)
     {
-        for (TranspositionEntry &e : buckets[i].entries)
+        for (TranspositionEntry& e : buckets[i].entries)
             if (e.key)
                 valid++;
     }

@@ -5,6 +5,6 @@
 
 const Score pieceScores[] = {0, 100, 320, 330, 500, 900, 0};
 
-extern Score Eval(Board& board);
+extern Score Eval(const Board& board);
 
 #endif
