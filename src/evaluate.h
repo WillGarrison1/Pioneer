@@ -5,6 +5,13 @@
 
 const Score pieceScores[] = {0, 100, 320, 330, 500, 900, 0};
 
-extern Score Eval(const Board& board);
+enum EvalType
+{
+    FAST,
+    FULL
+};
+
+template <EvalType type>
+Score Eval(Board &board);
 
 #endif

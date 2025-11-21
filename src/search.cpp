@@ -29,7 +29,7 @@ unsigned long long ttHits;
 unsigned long long maxNodes;
 unsigned long long maxTime;
 unsigned long long startTime;
-static TranspositionTable* tTable =
+static TranspositionTable *tTable =
     new (std::align_val_t(64)) TranspositionTable(1024 * 1024 * 64); // transposition table with a size of 64 MB
 
 bool isDone;
@@ -47,7 +47,7 @@ struct PVLine
 Score bestScore = -INF;
 Move bestMove = 0;
 
-std::string GetMoveListString(PVLine* l)
+std::string GetMoveListString(PVLine *l)
 {
     std::string moves;
     for (int i = 0; i < l->len; i++)
@@ -58,14 +58,14 @@ std::string GetMoveListString(PVLine* l)
     return moves;
 }
 
-Score qsearch(Board& board, int ply, Score alpha, Score beta)
+Score qsearch(Board &board, int ply, Score alpha, Score beta)
 {
     PROFILE_FUNC();
     numQNodes++;
 
     // probe tt
 
-    TranspositionEntry* entry = tTable->GetEntry(board.getHash());
+    TranspositionEntry *entry = tTable->GetEntry(board.getHash());
     Move bestEntryMove = 0;
     if (entry && entry->depth >= 0)
     {
@@ -85,7 +85,7 @@ Score qsearch(Board& board, int ply, Score alpha, Score beta)
         bestEntryMove = entry->move;
     }
 
-    Score pat = Eval(board);
+    Score pat = Eval<FULL>(board);
 
     if (pat >= beta)
         return pat;
@@ -120,6 +120,7 @@ Score qsearch(Board& board, int ply, Score alpha, Score beta)
 
     PVLine line;
     Move bestM = 0;
+    BoardState state;
 
     for (int i = 0; i < moves.size; i++)
     {
@@ -129,7 +130,7 @@ Score qsearch(Board& board, int ply, Score alpha, Score beta)
         if (pat + pieceScores[getType(m.captured())] < alpha - DELTA)
             continue;
 
-        board.makeMove(m);
+        board.makeMove(m, &state);
         Score score = -qsearch(board, ply + 1, -beta, -alpha);
         board.undoMove();
 
@@ -156,7 +157,7 @@ Score qsearch(Board& board, int ply, Score alpha, Score beta)
 }
 
 template <NodeType node>
-Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* prevLine)
+Score search(Board &board, int depth, int ply, Score alpha, Score beta, PVLine *prevLine)
 {
     if (isDone)
         return 0;
@@ -183,7 +184,7 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
 
     constexpr bool isPVNode = node == PVNode;
 
-    TranspositionEntry* entry = tTable->GetEntry(board.getHash());
+    TranspositionEntry *entry = tTable->GetEntry(board.getHash());
 
     Move bestEntryMove = 0;
 
@@ -233,11 +234,13 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
             return 0;
     }
 
+    BoardState state;
+
     // null move pruning
     int numEnemyPieces = popCount(board.getBB(ALL_PIECES, ~board.sideToMove) & ~board.getBB(PAWN));
     if (numEnemyPieces > 0 && board.getNumChecks() == 0 && depth >= NULL_DEPTH + 1)
     {
-        board.makeNullMove();
+        board.makeNullMove(&state);
         Score nullScore = -search<CUTNode>(board, depth - NULL_DEPTH, ply + 1, -beta, -beta + 1, &line);
         board.undoNullMove();
         if (nullScore > beta)
@@ -271,12 +274,12 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
         // Futility pruning
         if (depth < FUTILITY_DEPTH && move.type() == QUIET && !checkMove)
         {
-            Score eval = Eval(board) + FUTILITY_MARGIN(depth);
+            Score eval = Eval<FAST>(board) + FUTILITY_MARGIN(depth);
             if (eval <= alpha)
                 continue;
         }
 
-        board.makeMove(move);
+        board.makeMove(move, &state);
 
         // Late move reductions (LMR)
         Score score;
@@ -340,8 +343,8 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
         }
     }
 
-    if (bestM == 0)         // if we didn't search a move (futility pruned all moves)
-        return Eval(board); // return static evaluation
+    if (bestM == 0)               // if we didn't search a move (futility pruned all moves)
+        return Eval<FAST>(board); // return static evaluation
 
     if (!isDone) // don't store in transposition table because we cutoff early (Time cutoff, node cutoff, etc.)
         tTable->SetEntry(board.getHash(), bestS, depth, nodeBound, board.getPly() - ply, bestM);
@@ -349,7 +352,7 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
     return bestS;
 }
 
-Score iterativeDeepening(Board& board, unsigned int depth, unsigned int nodes, unsigned int movetime)
+Score iterativeDeepening(Board &board, unsigned int depth, unsigned int nodes, unsigned int movetime)
 {
     startTime = getTime();
 
@@ -376,6 +379,8 @@ Score iterativeDeepening(Board& board, unsigned int depth, unsigned int nodes, u
     maxTime = movetime;
     maxNodes = nodes;
 
+    BoardState state;
+
     for (unsigned int d = 1; d <= depth; d++)
     {
         PVLine line;
@@ -391,7 +396,7 @@ Score iterativeDeepening(Board& board, unsigned int depth, unsigned int nodes, u
 
         for (int i = 0; i < m.size; i++)
         {
-            board.makeMove(m.moves[i]);
+            board.makeMove(m.moves[i], &state);
             Score eval = -search<PVNode>(board, d - 1, 0, bestScore, INF, &line);
             board.undoMove();
 
@@ -429,7 +434,7 @@ Score iterativeDeepening(Board& board, unsigned int depth, unsigned int nodes, u
     return bestScore;
 }
 
-Move startSearch(Board& board, unsigned int depth, unsigned int nodes, unsigned int movetime)
+Move startSearch(Board &board, unsigned int depth, unsigned int nodes, unsigned int movetime)
 {
     isDone = false;
 

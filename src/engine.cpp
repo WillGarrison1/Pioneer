@@ -26,6 +26,7 @@ Engine::Engine()
     std::memset(killerMoves, 0, sizeof(killerMoves));
 
     board = new Board;
+    board->setFen(START_FEN, &states[0]);
 }
 
 Engine::~Engine()
@@ -43,7 +44,7 @@ void Engine::makemove(Move move)
         Move m = legal.moves[i];
         if (m.to() == move.to() && m.from() == move.from() && m.promotion() == move.promotion())
         {
-            board->makeMove(m);
+            board->makeMove(m, &states[board->getPly()]);
             break;
         }
     }
@@ -64,11 +65,12 @@ void Engine::goPerft(unsigned int depth)
 
     MoveList moves;
     generateMoves<ALL_MOVES>(*board, &moves);
+    BoardState state;
 
     for (int i = 0; i < moves.size; i++)
     {
         Move move = moves.moves[i];
-        board->makeMove(move);
+        board->makeMove(move, &state);
         unsigned long long count = perft(*board, depth - 1);
         board->undoMove();
 
@@ -83,7 +85,7 @@ void Engine::goPerft(unsigned int depth)
 
 void Engine::eval()
 {
-    Score score = Eval(*board) * (board->whiteToMove ? 1 : -1);
+    Score score = Eval<FULL>(*board) * (board->whiteToMove ? 1 : -1);
     std::cout << "Eval: " << score << std::endl;
     std::cout << "Pawns: " << board->getPawnMaterial() << std::endl;
     std::cout << "Other: " << board->getNonPawnMaterial() << std::endl;

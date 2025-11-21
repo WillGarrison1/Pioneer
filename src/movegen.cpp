@@ -19,7 +19,7 @@ struct MovegenMasks
 };
 
 // Special pin detection for en passant
-Direction isPinned(const Board& board, Square s, Square enPassant)
+Direction isPinned(const Board &board, Square s, Square enPassant)
 {
     const Bitboard kingBB = board.getBB(board.sideToMove, KING);
     const Bitboard blockers = board.getBB(ALL_PIECES) & ~sqrToBB(enPassant);
@@ -60,7 +60,7 @@ Direction isPinned(const Board& board, Square s, Square enPassant)
 
 // Pawn move generation
 template <MoveType mType>
-void generatePawnMoves(const Board& board, MoveList* list, MovegenMasks* masks)
+void generatePawnMoves(const Board &board, MoveList *list, MovegenMasks *masks)
 {
     PROFILE_FUNC();
 
@@ -193,7 +193,7 @@ void generatePawnMoves(const Board& board, MoveList* list, MovegenMasks* masks)
 // Knight move generation
 
 template <MoveType mType>
-void generateKnightMoves(const Board& board, MoveList* list, MovegenMasks* masks)
+void generateKnightMoves(const Board &board, MoveList *list, MovegenMasks *masks)
 {
     PROFILE_FUNC();
 
@@ -206,14 +206,17 @@ void generateKnightMoves(const Board& board, MoveList* list, MovegenMasks* masks
         Bitboard moves = knightMoves[from] & masks->checkBB;
 
         Bitboard captures = moves & board.getBB(~board.sideToMove);
-        Bitboard quiets = moves & ~board.getBB(ALL_PIECES);
 
-        while (quiets)
+        if constexpr (mType == ALL_MOVES)
         {
-            Square to = popLSB(quiets);
-            list->addMove(board.createMove(from, to, QUIET));
-        }
+            Bitboard quiets = moves & ~board.getBB(ALL_PIECES);
 
+            while (quiets)
+            {
+                Square to = popLSB(quiets);
+                list->addMove(board.createMove(from, to, QUIET));
+            }
+        }
         while (captures)
         {
             Square to = popLSB(captures);
@@ -223,7 +226,7 @@ void generateKnightMoves(const Board& board, MoveList* list, MovegenMasks* masks
 }
 
 template <MoveType mType>
-void generateBishopMoves(const Board& board, MoveList* list, MovegenMasks* masks)
+void generateBishopMoves(const Board &board, MoveList *list, MovegenMasks *masks)
 {
     PROFILE_FUNC();
 
@@ -249,7 +252,7 @@ void generateBishopMoves(const Board& board, MoveList* list, MovegenMasks* masks
 }
 
 template <MoveType mType>
-void generateRookMoves(const Board& board, MoveList* list, MovegenMasks* masks)
+void generateRookMoves(const Board &board, MoveList *list, MovegenMasks *masks)
 {
     PROFILE_FUNC();
     const Bitboard blockers = board.getBB(ALL_PIECES);
@@ -274,7 +277,7 @@ void generateRookMoves(const Board& board, MoveList* list, MovegenMasks* masks)
 }
 
 template <MoveType mType>
-void generateQueenMoves(const Board& board, MoveList* list, MovegenMasks* masks)
+void generateQueenMoves(const Board &board, MoveList *list, MovegenMasks *masks)
 {
     PROFILE_FUNC();
 
@@ -310,7 +313,7 @@ void generateQueenMoves(const Board& board, MoveList* list, MovegenMasks* masks)
 }
 
 template <MoveType mType>
-void generateKingMoves(const Board& board, MoveList* list)
+void generateKingMoves(const Board &board, MoveList *list)
 {
     PROFILE_FUNC();
     const Bitboard open = (mType == ALL_MOVES ? ~board.getBB(board.sideToMove) : board.getBB(~board.sideToMove)) &
@@ -325,7 +328,7 @@ void generateKingMoves(const Board& board, MoveList* list)
     }
 }
 
-void generateCastlingMoves(const Board& board, MoveList* list)
+void generateCastlingMoves(const Board &board, MoveList *list)
 {
     PROFILE_FUNC();
     const Bitboard blockers = board.getBB(ALL_PIECES);
@@ -367,18 +370,30 @@ void generateCastlingMoves(const Board& board, MoveList* list)
 }
 
 template <MoveType type>
-void generateMoves(Board& board, MoveList* list)
+void generateMoves(Board &board, MoveList *list)
 {
     PROFILE_FUNC();
     assert(board.getBB(board.sideToMove, KING));
 
-    Bitboard checkBB = board.computeAttackedBBs();
+    Square king = lsb(board.getBB(board.sideToMove, KING));
+    Bitboard checkers = board.getCheckers();
+
+    Bitboard checkBB = -1ULL;
+    if (board.getNumChecks() == 1)
+    {
+        Bitboard knights = checkers & board.getBB(KNIGHT);
+        if (checkers & knights) // if checker is a knight
+            checkBB = checkers;
+        else
+            checkBB = bitboardPaths[king][lsb(checkers)];
+    }
+
     Bitboard pinnedS;
     Bitboard pinnedD;
     board.computePins(pinnedS, pinnedD);
     MovegenMasks masks = {checkBB, pinnedS, pinnedD};
 
-    if (board.getNumChecks() < 2)
+    if (popCount(checkers) < 2)
     {
         generatePawnMoves<type>(board, list, &masks);
         generateKnightMoves<type>(board, list, &masks);
@@ -388,12 +403,12 @@ void generateMoves(Board& board, MoveList* list)
 
         if constexpr (type == ALL_MOVES)
         {
-            if (board.getNumChecks() == 0)
+            if (popCount(checkers) == 0)
                 generateCastlingMoves(board, list);
         }
     }
     generateKingMoves<type>(board, list);
 }
 
-template void generateMoves<ALL_MOVES>(Board& board, MoveList* list);
-template void generateMoves<CAPTURE>(Board& board, MoveList* list);
+template void generateMoves<ALL_MOVES>(Board &board, MoveList *list);
+template void generateMoves<CAPTURE>(Board &board, MoveList *list);

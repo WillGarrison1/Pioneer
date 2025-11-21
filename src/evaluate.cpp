@@ -11,7 +11,7 @@
 
 #define KING_ATTACKED -15 // penalty for squares attacked adjacent to king
 
-#define REACH_MULTIPLIER 2        // multiplier for reach (number of defended squares) bonue
+#define REACH_MULTIPLIER 1        // multiplier for reach (number of defended squares) bonue
 #define DOUBLED_PAWNS_PENALTY -20 // penalty for doubled pawns
 #define ISOLATED_PAWN_PENALTY -30 // penalty for isolated pawns
 #define PASSED_PAWN_BONUS 50      // bonus for passed pawns
@@ -133,14 +133,12 @@ Score EvalPiece<PAWN>(const Board &board)
         if (isolatedPawn)
             score += passedPawn ? ISOLATED_PAWN_PENALTY >> 1
                                 : ISOLATED_PAWN_PENALTY; // halve isolated penalty if also a passed pawn
-
     }
 
     while (pawnB)
     {
         piece = popLSB(pawnB);
         score -= GetPSQValue<PAWN, BLACK>(piece);
-        
 
         bool passedPawn = !(passedPawnBB[BLACK][piece] & pawnWAll);
         bool isolatedPawn = !(isolatedPawnBB[piece] & pawnBAll);
@@ -155,11 +153,11 @@ Score EvalPiece<PAWN>(const Board &board)
                                 : ISOLATED_PAWN_PENALTY; // halve isolated penalty if also a passed pawn
     }
 
-
     return score;
 }
 
-Score Eval(const Board &board)
+template <EvalType type>
+Score Evaluate(Board &board)
 {
     PROFILE_FUNC();
 
@@ -167,11 +165,23 @@ Score Eval(const Board &board)
                   EvalPiece<ROOK>(board) + EvalPiece<QUEEN>(board) + EvalPiece<KING>(board);
 
     // Add bonus for the amount of squares attacked/defended by each side
-    // score += (popCount(board.getAttacked(WHITE)) - popCount(board.getAttacked(BLACK))) * REACH_MULTIPLIER;
+    score += (popCount(board.getAttacked(WHITE)) - popCount(board.getAttacked(BLACK))) * REACH_MULTIPLIER;
 
     score += board.getPawnMaterial() + board.getNonPawnMaterial(); // score material
 
     score += MOVING_BONUS * (board.whiteToMove ? 1 : -1); // add small bonus to side that is going to move
 
     return score * (board.whiteToMove ? 1 : -1);
+}
+
+template <>
+Score Eval<FULL>(Board &board)
+{
+    return Evaluate<FULL>(board);
+}
+
+template <>
+Score Eval<FAST>(Board &board)
+{
+    return Evaluate<FAST>(board);
 }

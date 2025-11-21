@@ -21,7 +21,7 @@ public:
 
     void setFen(const std::string &fen)
     {
-        board->setFen(fen);
+        board->setFen(fen, &states[0]);
     }
 
     void go(unsigned int depth, unsigned int nodes, unsigned int movetime);
@@ -40,6 +40,7 @@ public:
 
 private:
     Board *board;
+    BoardState states[MAX_PLY];
 };
 
 #endif
