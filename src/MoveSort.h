@@ -9,18 +9,18 @@
 
 #include <algorithm>
 
-#define CAPTURE_BONUS 4000
-#define PROMOTION_BONUS 4000
+#define CAPTURE_BONUS 10000
+#define PROMOTION_BONUS 9000
 
 #define MVV_LVA_VICTIM_MULTI 3
-#define MVV_LVA_ATTACKER_MULTI_GOOD 1
-#define MVV_LVA_ATTACKER_MULTI_BAD 5
+#define MVV_LVA_ATTACKER_MULTI_GOOD 5
+#define MVV_LVA_ATTACKER_MULTI_BAD 1
 
 #define DEFENDED_BONUS 25
 #define ATTACKED_PENALTY -35
 
 #define PV_BONUS 30000
-#define KILLER_MOVE_BONUS 3000
+#define KILLER_MOVE_BONUS 8000
 #define MAX_HISTORY 1000
 
 struct MoveVal
@@ -55,30 +55,32 @@ inline void addKillerMove(unsigned char ply, Move m)
 inline void addHistoryBonus(bool isBlack, Move m, int depth)
 {
     int clampedBonus = std::clamp(depth * depth, -MAX_HISTORY, MAX_HISTORY);
-    moveHistory[isBlack][m.from()][m.to()] += clampedBonus - moveHistory[isBlack][m.from()][m.to()] * std::abs(clampedBonus) / MAX_HISTORY;
+    moveHistory[isBlack][m.from()][m.to()] +=
+        clampedBonus - moveHistory[isBlack][m.from()][m.to()] * std::abs(clampedBonus) / MAX_HISTORY;
 }
 
 inline void addHistoryPenalty(bool isBlack, Move m, int depth)
 {
 
     const int penalty = std::clamp(depth * depth, -MAX_HISTORY, MAX_HISTORY);
-    moveHistory[isBlack][m.from()][m.to()] -= penalty + moveHistory[isBlack][m.from()][m.to()] * std::abs(penalty) / MAX_HISTORY;
+    moveHistory[isBlack][m.from()][m.to()] -=
+        penalty + moveHistory[isBlack][m.from()][m.to()] * std::abs(penalty) / MAX_HISTORY;
 }
 
-inline Score Mvv_Lva_Score(const Board &board, Move m)
+inline Score Mvv_Lva_Score(const Board& board, Move m)
 {
     Bitboard attacked = board.getAttacked(~board.sideToMove);
     bool isVictimDefended = (sqrToBB(m.to()) & attacked) != 0;
+    PieceType victimType = getType(board.getSQ(m.to()));
+    PieceType pieceType = getType(board.getSQ(m.from()));
 
-    return (pieceScores[getType(m.captured())] * MVV_LVA_VICTIM_MULTI - pieceScores[getType(m.piece())]) *
-           (isVictimDefended
-                ? MVV_LVA_ATTACKER_MULTI_BAD
-                : MVV_LVA_ATTACKER_MULTI_GOOD);
+    return (pieceScores[victimType] * MVV_LVA_VICTIM_MULTI - pieceScores[pieceType]) *
+           (isVictimDefended ? MVV_LVA_ATTACKER_MULTI_BAD : MVV_LVA_ATTACKER_MULTI_GOOD);
 }
 
-extern MoveVal ScoreMove(const Board &board, Move m);
+extern MoveVal ScoreMove(const Board& board, Move m);
 
-extern MoveVal ScoreMoveQ(const Board &board, Move m);
+extern MoveVal ScoreMoveQ(const Board& board, Move m);
 
 /**
  * @brief Sorts moves for qsearch
@@ -86,11 +88,11 @@ extern MoveVal ScoreMoveQ(const Board &board, Move m);
  * @param board
  * @param moves
  */
-inline void SortMovesQ(const Board &board, MoveList *moves);
+inline void SortMovesQ(const Board& board, MoveList* moves);
 
-extern void SortMovesQ(const Board &board, MoveList *moves, Move best);
+extern void SortMovesQ(const Board& board, MoveList* moves, Move best);
 
-extern void SortMoves(const Board &board, MoveList *moves);
+extern void SortMoves(const Board& board, MoveList* moves);
 
-extern void SortMoves(const Board &board, MoveList *moves, Move prev);
+extern void SortMoves(const Board& board, MoveList* moves, Move prev);
 #endif

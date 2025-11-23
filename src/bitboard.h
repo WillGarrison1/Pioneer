@@ -3,6 +3,9 @@
 
 #include "types.h"
 #include <cassert>
+#ifdef _MSC_VER
+#include <intrin.h>
+#endif
 
 const Bitboard emptyBB = 0ULL;
 const Bitboard fullBB = 0xFFFFFFFFFFFFFFFFULL;
@@ -60,6 +63,7 @@ extern const Bitboard (*bitboardRays)[64];
 
 extern Bitboard passedPawnBB[9][64]; // contains masks for finding passed pawns [side][square]
 extern Bitboard isolatedPawnBB[64];  // contains masks for finding isloated pawns [square]
+extern Bitboard pawnShield[2][8];    // contains masks for calculating shielded pawns [isBlack][square]
 
 // Bitboard operations
 
@@ -68,17 +72,17 @@ constexpr Bitboard sqrToBB(const Square sq)
     return 1ULL << sq;
 }
 
-inline void setBit(Bitboard &bb, const Square sq)
+inline void setBit(Bitboard& bb, const Square sq)
 {
     bb |= 1ULL << sq;
 }
 
-inline void clearBit(Bitboard &bb, const Square sq)
+inline void clearBit(Bitboard& bb, const Square sq)
 {
     bb &= ~(1ULL << sq);
 }
 
-inline void toggleBit(Bitboard &bb, const Square sq)
+inline void toggleBit(Bitboard& bb, const Square sq)
 {
     bb ^= 1ULL << sq;
 }
@@ -88,11 +92,11 @@ inline bool getBit(const Bitboard bb, const Square sq)
     return bb & (1ULL << sq);
 }
 
-constexpr Square lsb(const Bitboard bb)
+inline Square lsb(const Bitboard bb)
 {
     assert(bb != 0);
 #if _MSC_VER
-    unsigned long index;
+    unsigned long index = 0;
     _BitScanForward64(&index, bb);
     return static_cast<Square>(index);
 #else
@@ -100,7 +104,7 @@ constexpr Square lsb(const Bitboard bb)
 #endif
 }
 
-constexpr Square msb(const Bitboard bb)
+inline Square msb(const Bitboard bb)
 {
     assert(bb != 0);
 #if _MSC_VER
@@ -112,7 +116,7 @@ constexpr Square msb(const Bitboard bb)
 #endif
 }
 
-inline Square popLSB(Bitboard &bb)
+inline Square popLSB(Bitboard& bb)
 {
     Square bit = lsb(bb);
     bb &= bb - 1;

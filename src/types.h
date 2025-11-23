@@ -139,9 +139,8 @@ enum MoveType : unsigned int
     QUIET = 0,
     CAPTURE = 1,
     CASTLE = 2,
-    EN_PASSANT = 4,
-    PROMOTION = 8,
-    ALL_MOVES = 31
+    PROMOTION = 3,
+    ALL_MOVES = 4
 };
 
 constexpr MoveType operator|(MoveType a, MoveType b)

@@ -7,35 +7,30 @@
 #include <string>
 
 /**
- * @brief Represents a move, it contains 32bits that stores the move
+ * @brief Represents a move, it contains 16bits that stores the move
  * @paragraph
  * The format is as follows:
  *  (Bit)    (Description)
  *  1 - 6  : From square
  *  7 - 12 : To square
- * 13 - 16 : Move piece
- * 17 - 20 : Captured piece
- * 21 - 26 : Move type
- * 27 - 29 : Castle type
- * 30 - 32 : Promotion PieceType
+ * 13 - 14 : Move type (Quiet, Capture, Castle, Promotion)
+ * 15 - 16 : Promotion PieceType (K,B,R,Q)
  */
 class Move
 {
-public:
+  public:
     constexpr Move() : m_move(0)
     {
     }
-    constexpr Move(Square from, Square to, Piece piece, Piece captured = 0, MoveType type = QUIET,
-                   CastlingRights cRights = NONE_CASTLE, PieceType promotion = EMPTY)
-        : m_move((from) | (to << 6) | (piece << 12) | (captured << 16) | (type << 20) | (cRights << 25) |
-                 (promotion << 29))
+    constexpr Move(Square from, Square to, MoveType type = QUIET, PieceType promotion = KNIGHT)
+        : m_move((from) | (to << 6) | (type << 12) | ((promotion - 2) << 14))
     {
     }
 
-    Move(unsigned int move) : m_move(move)
+    Move(unsigned short move) : m_move(move)
     {
     }
-    Move(const Move &move) : m_move(move.m_move)
+    Move(const Move& move) : m_move(move.m_move)
     {
     }
     Move(const std::string str);
@@ -50,49 +45,32 @@ public:
         return static_cast<Square>((m_move >> 6) & 0x3F);
     }
 
-    constexpr Piece piece() const
-    {
-        return static_cast<Piece>((m_move >> 12) & 0xF);
-    }
-
-    constexpr Piece captured() const
-    {
-        return static_cast<Piece>((m_move >> 16) & 0xF);
-    }
-
-    constexpr CastlingRights castleRights() const
-    {
-        return static_cast<CastlingRights>((m_move >> 25) & 0xF);
-    }
-
     constexpr MoveType type() const
     {
-        return static_cast<MoveType>((m_move >> 20) & 0xF);
+        return static_cast<MoveType>((m_move >> 12) & 0x3);
     }
 
     constexpr PieceType promotion() const
     {
-        return static_cast<PieceType>((m_move >> 29) & 0x7);
+        return static_cast<PieceType>(((m_move >> 14) & 0x3) + 2);
     }
 
     // Tells if a move is of a type
     template <MoveType T>
     constexpr bool isType()
     {
-        if constexpr (T == QUIET)
-            return type() == QUIET;
-        return (type() & T);
+        return type() == T;
     }
 
-    constexpr unsigned int getMove() const
+    constexpr unsigned short getMove() const
     {
         return m_move;
     }
 
     std::string toString();
 
-private:
-    unsigned int m_move;
+  private:
+    unsigned short m_move;
 };
 
 constexpr bool operator==(Move m1, Move m2)
@@ -112,7 +90,6 @@ struct MoveList
 
     void addMove(Move move)
     {
-        assert(size < 256);
         moves[size++] = move;
     }
 
@@ -127,7 +104,7 @@ struct MoveList
         return moves[index];
     }
 
-    Move &operator[](int index)
+    Move& operator[](int index)
     {
         assert(index < size);
         return moves[index];

@@ -11,27 +11,25 @@ alignas(64) Bitboard pawnAttacks[9][64];
 alignas(64) Bitboard pawnMoves[9][64];
 alignas(64) Bitboard rookMasks[64];
 alignas(64) Bitboard bishopMasks[64];
-alignas(64) Bitboard bitboardPaths[64][64]; // bitboards with bits from one square to another (note that the start squares/first
-                                            // index isn't included)
+alignas(64) Bitboard bitboardPaths[64][64]; // bitboards with bits from one square to another (note that the start
+                                            // squares/first index isn't included)
 alignas(64) Bitboard _bitboardRays[19][64] =
-    {};                                                 // bitboards with bits starting from a certain square heading off the board (start square isn't included)
-const Bitboard (*bitboardRays)[64] = _bitboardRays + 9; // offset pointer to array so negative directions can be used as an index
+    {}; // bitboards with bits starting from a certain square heading off the board (start square isn't included)
+const Bitboard (*bitboardRays)[64] = _bitboardRays +
+                                     9; // offset pointer to array so negative directions can be used as an index
 
 alignas(64) Bitboard passedPawnBB[9][64];
 alignas(64) Bitboard isolatedPawnBB[64];
+alignas(64) Bitboard pawnShield[2][8]; // pawns shields for the king [isBlack][file]
 
 void initBBs()
 {
 
-    constexpr Direction knightDirs[] = {
-        NORTH + NORTH + EAST, NORTH + NORTH + WEST,
-        SOUTH + SOUTH + EAST, SOUTH + SOUTH + WEST,
-        EAST + EAST + NORTH, EAST + EAST + SOUTH,
-        WEST + WEST + NORTH, WEST + WEST + SOUTH};
+    constexpr Direction knightDirs[] = {NORTH + NORTH + EAST, NORTH + NORTH + WEST, SOUTH + SOUTH + EAST,
+                                        SOUTH + SOUTH + WEST, EAST + EAST + NORTH,  EAST + EAST + SOUTH,
+                                        WEST + WEST + NORTH,  WEST + WEST + SOUTH};
 
-    constexpr Direction kingDirs[] = {
-        NORTH, SOUTH, EAST, WEST,
-        NORTH_EAST, NORTH_WEST, SOUTH_EAST, SOUTH_WEST};
+    constexpr Direction kingDirs[] = {NORTH, SOUTH, EAST, WEST, NORTH_EAST, NORTH_WEST, SOUTH_EAST, SOUTH_WEST};
 
     constexpr Direction pawnWAttackDirs[] = {NORTH_EAST, NORTH_WEST};
     constexpr Direction pawnBAttackDirs[] = {SOUTH_EAST, SOUTH_WEST};
@@ -144,6 +142,36 @@ void initBBs()
             passedPawnBB[BLACK][sqr] = shift(fileBBs[file] | fileBBs[left] | fileBBs[right], SOUTH * (8 - rank));
         }
         isolatedPawnBB[sqr] = (fileBBs[left] | fileBBs[right]) & ~fileBBs[file];
+
+        // Compute Pawn Shields
+
+        Bitboard shield = 0ULL;
+
+        if (rank == 0)
+        {
+            if (file == FILE_A)
+            {
+                pawnShield[0][file] = sqrToBB(SQ_A2) | sqrToBB(SQ_B2) | sqrToBB(SQ_A3) | sqrToBB(SQ_B3);
+                pawnShield[1][file] = sqrToBB(SQ_A7) | sqrToBB(SQ_G7) | sqrToBB(SQ_A6) | sqrToBB(SQ_B6);
+            }
+            else if (file == FILE_H)
+            {
+                pawnShield[0][file] = sqrToBB(SQ_H2) | sqrToBB(SQ_G2) | sqrToBB(SQ_H3) | sqrToBB(SQ_G3);
+                pawnShield[1][file] = sqrToBB(SQ_H7) | sqrToBB(SQ_G7) | sqrToBB(SQ_H6) | sqrToBB(SQ_G6);
+            }
+            else
+            {
+                Bitboard king = sqrToBB(sqr);
+
+                Bitboard straight = shift(king, SOUTH_EAST) | shift(king, SOUTH_WEST) | shift(king, SOUTH);
+                straight |= shift(king, SOUTH);
+
+                pawnShield[0][file] = straight;
+
+                straight = shift(king, SOUTH * 3); // rank 3 -> rank 6
+                pawnShield[1][file] = straight;
+            }
+        }
     }
 }
 

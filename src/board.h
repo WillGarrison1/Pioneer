@@ -3,10 +3,10 @@
 
 #include <string>
 
+#include "bitboard.h"
 #include "move.h"
 #include "piece.h"
 #include "types.h"
-#include "bitboard.h"
 
 #define MAX_PLY 256
 
@@ -21,24 +21,26 @@ struct BoardState
 
     Bitboard attacks[2]; // the attacks a side has (white = 0 black = 1)
     Bitboard checkers;
+    Piece captured;
 
     unsigned char move50rule;
+    unsigned char repetition;
     Score pawn_material;
     Score non_pawn_material;
 
-    BoardState *prev;
+    BoardState* prev;
 
     Key zobristHash;
 
     BoardState();
-    BoardState(BoardState *prev);
+    BoardState(BoardState* prev);
 
     ~BoardState();
 };
 
 class Board
 {
-public:
+  public:
     Board();
     ~Board();
 
@@ -46,14 +48,14 @@ public:
     void removePiece(Square square);
     void movePiece(Square from, Square to);
 
-    void addPieceZobrist(Piece piece, Square to, Key *key);
-    void removePieceZobrist(Square from, Key *key);
-    void movePieceZobrist(Square from, Square to, Key *key); // moves the piece and updates the zobrist hash
+    void addPieceZobrist(Piece piece, Square to, Key* key);
+    void removePieceZobrist(Square from, Key* key);
+    void movePieceZobrist(Square from, Square to, Key* key); // moves the piece and updates the zobrist hash
 
-    void makeMove(Move move, BoardState *newState);
+    void makeMove(Move move, BoardState* newState);
     void undoMove();
 
-    void makeNullMove(BoardState *state);
+    void makeNullMove(BoardState* state);
     void undoNullMove();
 
     /**
@@ -66,7 +68,7 @@ public:
 
     void print() const;
 
-    void setFen(const std::string &fen, BoardState *newState);
+    void setFen(const std::string& fen, BoardState* newState);
     std::string getFen() const;
 
     // Clears bitboards and board
@@ -77,13 +79,13 @@ public:
 
     Bitboard getAttackers(Square sqr);
 
-    void computePins(Bitboard &pinnedS, Bitboard &pinnedD);
+    void computePins(Bitboard& pinnedS, Bitboard& pinnedD);
 
     // Move stuff
     constexpr Move createMove(Square from, Square to, MoveType mType = QUIET, PieceType promote = EMPTY,
                               CastlingRights castle = NONE_CASTLE) const
     {
-        return Move(from, to, board[from], board[to], mType, castle, promote);
+        return Move(from, to, mType, promote);
     }
 
     // Get bitboards
@@ -157,7 +159,7 @@ public:
         return static_cast<Square>(state->enPassantSquare);
     }
 
-    inline const BoardState *getState() const
+    inline const BoardState* getState() const
     {
         return state;
     }
@@ -187,7 +189,7 @@ public:
     bool whiteToMove; // True if white is to move
     Color sideToMove; // Side to move
 
-private:
+  private:
     unsigned char ply;
 
     Bitboard pieceBB[ALL_PIECES + 1]; // Bitboards for each piece type
@@ -195,7 +197,7 @@ private:
 
     Piece board[64]; // Board representation
 
-    BoardState *state; // Current board state
+    BoardState* state; // Current board state
 };
 
 constexpr static int size = sizeof(Board);

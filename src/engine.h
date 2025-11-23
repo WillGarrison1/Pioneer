@@ -9,7 +9,7 @@
  */
 class Engine
 {
-public:
+  public:
     Engine();
     ~Engine();
 
@@ -19,7 +19,7 @@ public:
         board->getFen();
     }
 
-    void setFen(const std::string &fen)
+    void setFen(const std::string& fen)
     {
         board->setFen(fen, &states[0]);
     }
@@ -38,9 +38,9 @@ public:
 
     void isCheck(Move move);
 
-private:
-    Board *board;
-    BoardState states[MAX_PLY];
+  private:
+    Board* board;
+    BoardState states[MAX_PLY + 1]; // plus 1 for starting point
 };
 
 #endif

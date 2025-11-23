@@ -1,6 +1,8 @@
 #ifndef TRANSPOSITION_H
 #define TRANSPOSITION_H
 
+#include <cstdint>
+
 #include "move.h"
 #include "types.h"
 
@@ -15,23 +17,38 @@ enum class NodeBound : unsigned char
 
 struct TranspositionEntry
 {
-    unsigned short key;     // the upper 32 bits of the zobrist hash
-    Score score; // The score of this position at depth
-    Move move;   // best move to be played
+    unsigned short key; // the upper 16 bits of the zobrist hash
+    Score score;        // The score of this position at depth
+    uint16_t move;      // best move to be played
 
-    NodeBound bound;  // the bounds of this positions score
     unsigned char depth; // the depth the score was calculated at
-    unsigned char age;   // the ply at which this position is
-};
+    unsigned char flags; // the age at which this position is and the node bound
+                         // format: nodebound << 6 | age
+    void Set(Key key, Score score, Move move, unsigned char depth, unsigned char age, NodeBound bound);
+
+    inline NodeBound getNodeBound() const
+    {
+        return (NodeBound)(flags >> 6);
+    }
+
+    inline unsigned char getAge() const
+    {
+        return flags & 0x3f;
+    }
+} __attribute__((packed));
 
 struct TranspositionBucket
 {
     TranspositionEntry entries[BUCKET_SIZE];
+    char padding[2]; // pad to 32 bytes
 };
 
+
+static_assert(sizeof(TranspositionEntry) == 10, "TranspositionEntry is not 10 bytes!");
+static_assert(sizeof(TranspositionBucket) == 32, "TranspositionBucket is not 32 bytes!");
 class TranspositionTable
 {
-public:
+  public:
     /**
      * @brief Construct a new Transposition Table object
      *
@@ -41,14 +58,20 @@ public:
 
     ~TranspositionTable();
 
-    TranspositionEntry *GetEntry(Key key);
+    inline void IncrementAge()
+    {
+        age = (age + 1) & 0x3f;
+    };
 
-    void SetEntry(Key zobrist, Score score, unsigned char depth, NodeBound bound, unsigned char ply, Move bestMove);
+    TranspositionEntry* GetEntry(Key key);
+
+    void SetEntry(Key zobrist, Score score, unsigned char depth, NodeBound bound, Move bestMove);
 
     float GetFull(); // gets how full the table is, from 0-1
 
-private:
-    TranspositionBucket *buckets;
+  private:
+    TranspositionBucket* buckets;
+    unsigned char age;
     unsigned long long numBuckets;
 };
 

@@ -42,14 +42,13 @@ void Engine::makemove(Move move)
     for (int i = 0; i < legal.size; i++)
     {
         Move m = legal.moves[i];
-        if (m.to() == move.to() && m.from() == move.from() && m.promotion() == move.promotion())
+        if (m.to() == move.to() && m.from() == move.from() &&
+            (m.type() == PROMOTION && move.promotion() == m.promotion() || m.type() != PROMOTION))
         {
-            board->makeMove(m, &states[board->getPly()]);
+            board->makeMove(m, &states[board->getPly() + 1]);
             break;
         }
     }
-
-    std::cout << board->getHash() << std::endl;
 }
 
 void Engine::go(unsigned int depth, unsigned int nodes, unsigned int movetime)

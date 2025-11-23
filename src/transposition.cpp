@@ -3,10 +3,19 @@
 #include <cstring>
 #include <iostream>
 
-Key boardHashes[64][(KING | BLACK) + 1];
+alignas(64) Key boardHashes[64][(KING | BLACK) + 1];
 Key isBlackHash;
 Key castleRightsHash[16];
 Key enPassantHash[8];
+
+void TranspositionEntry::Set(Key key, Score score, Move move, unsigned char depth, unsigned char age, NodeBound bound)
+{
+    this->key = key >> 48;
+    this->score = score;
+    this->move = move.getMove();
+    this->depth = depth;
+    this->flags = ((unsigned char)bound << 6) | age;
+}
 
 TranspositionTable::TranspositionTable(unsigned long long size)
 {
@@ -16,6 +25,7 @@ TranspositionTable::TranspositionTable(unsigned long long size)
     std::cout << "Num Buckets: " << this->numBuckets << std::endl;
 
     this->buckets = new (std::align_val_t(64)) TranspositionBucket[numBuckets];
+    age = 0;
 
     memset(buckets, 0, numBuckets * sizeof(TranspositionBucket));
 }
@@ -39,8 +49,7 @@ TranspositionEntry* TranspositionTable::GetEntry(Key key)
     return result;
 }
 
-void TranspositionTable::SetEntry(Key zobrist, Score score, unsigned char depth, NodeBound bound, unsigned char ply,
-                                  Move bestMove)
+void TranspositionTable::SetEntry(Key zobrist, Score score, unsigned char depth, NodeBound bound, Move bestMove)
 {
     unsigned long long index = zobrist & (this->numBuckets - 1); // much faster than modulo
     TranspositionBucket* bucket = &this->buckets[index];
@@ -57,9 +66,14 @@ void TranspositionTable::SetEntry(Key zobrist, Score score, unsigned char depth,
         }
 
         int points = 0;
-        if (e.age < ply)
+        if (e.getAge() != age)
             points += 4;           // punish for being older
         points += depth - e.depth; // punish for having a lower depth (higher points = worse)
+
+        if (e.getNodeBound() == NodeBound::Exact)
+            points -= 1;
+        if (bound == NodeBound::Exact)
+            points += 1;
 
         if (maxPoints < points)
         {
@@ -68,12 +82,7 @@ void TranspositionTable::SetEntry(Key zobrist, Score score, unsigned char depth,
         }
     }
 
-    entry->key = zobrist >> 48;
-    entry->score = score;
-    entry->depth = depth;
-    entry->bound = bound;
-    entry->age = ply;
-    entry->move = bestMove;
+    entry->Set(zobrist, score, bestMove, depth, age, bound);
 }
 
 float TranspositionTable::GetFull()

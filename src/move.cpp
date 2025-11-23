@@ -21,7 +21,7 @@ Move::Move(const std::string str)
     Square from = getSquare(fFile, fRank);
     Square to = getSquare(tFile, tRank);
 
-    m_move = (from) | (to << 6) | (promote << 29);
+    *this = Move(from, to);
 }
 
 std::string Move::toString()
@@ -41,7 +41,7 @@ std::string Move::toString()
     out += char('a' + tFile);
     out += char('1' + tRank);
 
-    if (promotion() != EMPTY)
+    if (type() == PROMOTION)
     {
         out += pieceToString(makePiece(promotion(), BLACK));
     }

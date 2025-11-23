@@ -19,7 +19,7 @@ struct MovegenMasks
 };
 
 // Special pin detection for en passant
-Direction isPinned(const Board &board, Square s, Square enPassant)
+Direction isPinned(const Board& board, Square s, Square enPassant)
 {
     const Bitboard kingBB = board.getBB(board.sideToMove, KING);
     const Bitboard blockers = board.getBB(ALL_PIECES) & ~sqrToBB(enPassant);
@@ -60,7 +60,7 @@ Direction isPinned(const Board &board, Square s, Square enPassant)
 
 // Pawn move generation
 template <MoveType mType>
-void generatePawnMoves(const Board &board, MoveList *list, MovegenMasks *masks)
+void generatePawnMoves(const Board& board, MoveList* list, MovegenMasks* masks)
 {
     PROFILE_FUNC();
 
@@ -176,7 +176,7 @@ void generatePawnMoves(const Board &board, MoveList *list, MovegenMasks *masks)
             Direction pinned = isPinned(board, from, enPassantAttacked);
             if (!(pinned != NONE_DIR && pinned != forward + EAST && pinned != -forward + WEST))
                 // piece is pinned
-                list->addMove(board.createMove(from, to, EN_PASSANT | CAPTURE));
+                list->addMove(board.createMove(from, to, CAPTURE));
         }
         if (attacksWest)
         {
@@ -185,7 +185,7 @@ void generatePawnMoves(const Board &board, MoveList *list, MovegenMasks *masks)
             Direction pinned = isPinned(board, from, enPassantAttacked);
             if (!(pinned != NONE_DIR && pinned != forward + WEST && pinned != -forward + EAST))
                 // piece is pinned
-                list->addMove(board.createMove(from, to, EN_PASSANT | CAPTURE));
+                list->addMove(board.createMove(from, to, CAPTURE));
         }
     }
 }
@@ -193,7 +193,7 @@ void generatePawnMoves(const Board &board, MoveList *list, MovegenMasks *masks)
 // Knight move generation
 
 template <MoveType mType>
-void generateKnightMoves(const Board &board, MoveList *list, MovegenMasks *masks)
+void generateKnightMoves(const Board& board, MoveList* list, MovegenMasks* masks)
 {
     PROFILE_FUNC();
 
@@ -226,7 +226,7 @@ void generateKnightMoves(const Board &board, MoveList *list, MovegenMasks *masks
 }
 
 template <MoveType mType>
-void generateBishopMoves(const Board &board, MoveList *list, MovegenMasks *masks)
+void generateBishopMoves(const Board& board, MoveList* list, MovegenMasks* masks)
 {
     PROFILE_FUNC();
 
@@ -252,7 +252,7 @@ void generateBishopMoves(const Board &board, MoveList *list, MovegenMasks *masks
 }
 
 template <MoveType mType>
-void generateRookMoves(const Board &board, MoveList *list, MovegenMasks *masks)
+void generateRookMoves(const Board& board, MoveList* list, MovegenMasks* masks)
 {
     PROFILE_FUNC();
     const Bitboard blockers = board.getBB(ALL_PIECES);
@@ -277,7 +277,7 @@ void generateRookMoves(const Board &board, MoveList *list, MovegenMasks *masks)
 }
 
 template <MoveType mType>
-void generateQueenMoves(const Board &board, MoveList *list, MovegenMasks *masks)
+void generateQueenMoves(const Board& board, MoveList* list, MovegenMasks* masks)
 {
     PROFILE_FUNC();
 
@@ -313,7 +313,7 @@ void generateQueenMoves(const Board &board, MoveList *list, MovegenMasks *masks)
 }
 
 template <MoveType mType>
-void generateKingMoves(const Board &board, MoveList *list)
+void generateKingMoves(const Board& board, MoveList* list)
 {
     PROFILE_FUNC();
     const Bitboard open = (mType == ALL_MOVES ? ~board.getBB(board.sideToMove) : board.getBB(~board.sideToMove)) &
@@ -328,7 +328,7 @@ void generateKingMoves(const Board &board, MoveList *list)
     }
 }
 
-void generateCastlingMoves(const Board &board, MoveList *list)
+void generateCastlingMoves(const Board& board, MoveList* list)
 {
     PROFILE_FUNC();
     const Bitboard blockers = board.getBB(ALL_PIECES);
@@ -370,7 +370,7 @@ void generateCastlingMoves(const Board &board, MoveList *list)
 }
 
 template <MoveType type>
-void generateMoves(Board &board, MoveList *list)
+void generateMoves(Board& board, MoveList* list)
 {
     PROFILE_FUNC();
     assert(board.getBB(board.sideToMove, KING));
@@ -410,5 +410,5 @@ void generateMoves(Board &board, MoveList *list)
     generateKingMoves<type>(board, list);
 }
 
-template void generateMoves<ALL_MOVES>(Board &board, MoveList *list);
-template void generateMoves<CAPTURE>(Board &board, MoveList *list);
+template void generateMoves<ALL_MOVES>(Board& board, MoveList* list);
+template void generateMoves<CAPTURE>(Board& board, MoveList* list);

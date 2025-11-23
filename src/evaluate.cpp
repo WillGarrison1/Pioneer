@@ -9,13 +9,14 @@
 #define DEFENDED_BONUS 10    // bonus for defended piece
 #define ATTACKED_PENALTY -15 // penalty for attacked piece
 
-#define KING_ATTACKED -15 // penalty for squares attacked adjacent to king
+#define KING_ATTACKED -10 // penalty for squares attacked adjacent to king
 
-#define REACH_MULTIPLIER 1        // multiplier for reach (number of defended squares) bonue
+#define PAWN_SHIELD_PENALTY -25
+#define REACH_MULTIPLIER 3        // multiplier for reach (number of defended squares) bonue
 #define DOUBLED_PAWNS_PENALTY -20 // penalty for doubled pawns
 #define ISOLATED_PAWN_PENALTY -30 // penalty for isolated pawns
 #define PASSED_PAWN_BONUS 50      // bonus for passed pawns
-#define MOVING_BONUS 5            // small bonus for moving side
+#define BISHOP_PAIR_BONUS 40
 
 /**
  * @brief Evaluates a Piece from White's perspective
@@ -24,7 +25,7 @@
  * @return Score
  */
 template <PieceType P>
-Score EvalPiece(const Board &board)
+Score EvalPiece(const Board& board)
 {
 
     Score score = 0;
@@ -59,7 +60,45 @@ Score EvalPiece(const Board &board)
 }
 
 template <>
-Score EvalPiece<KING>(const Board &board)
+Score EvalPiece<BISHOP>(const Board& board)
+{
+
+    Score score = 0;
+
+    Bitboard pieceW = board.getBB(WHITE, BISHOP);
+    Bitboard pieceB = board.getBB(BLACK, BISHOP);
+
+    const Bitboard defendedW = board.getAttacked(WHITE);
+    const Bitboard defendedB = board.getAttacked(BLACK);
+
+    Square piece;
+
+    score += popCount(pieceW & defendedW) * DEFENDED_BONUS;
+    score += popCount(pieceW & defendedB) * ATTACKED_PENALTY;
+
+    score -= popCount(pieceB & defendedB) * DEFENDED_BONUS;
+    score -= popCount(pieceB & defendedW) * ATTACKED_PENALTY;
+
+    score += (Score)(popCount(pieceW) == 2) * BISHOP_PAIR_BONUS;
+    score -= (Score)(popCount(pieceB) == 2) * BISHOP_PAIR_BONUS;
+
+    while (pieceW)
+    {
+        piece = popLSB(pieceW);
+        score += GetPSQValue<BISHOP, WHITE>(piece);
+    }
+
+    while (pieceB)
+    {
+        piece = popLSB(pieceB);
+        score -= GetPSQValue<BISHOP, BLACK>(piece);
+    }
+
+    return score;
+}
+
+template <>
+Score EvalPiece<KING>(const Board& board)
 {
     Score score = 0;
 
@@ -80,12 +119,29 @@ Score EvalPiece<KING>(const Board &board)
     Bitboard attackedKingBSquares = kingMoves[pieceB] & defendedW;
 
     score -= popCount(attackedKingBSquares) * KING_ATTACKED;
+    if ((board.getState()->castling & (CASTLE_WK | CASTLE_WQ)) == 0) // if white can't castle, check for pawn shield
+    {
+        const Bitboard maskW = pawnShield[0][getFile(pieceW)];
+        const int totalShieldersW =
+            popCount(maskW & rankBBs[RANK_2]); // get number of possible shielded pawns by getting the width of the mask
+        const int numShieldersW = popCount(board.getBB(WHITE, PAWN)) & maskW;
 
+        score += std::max(totalShieldersW - numShieldersW, 0) * PAWN_SHIELD_PENALTY;
+    }
+
+    if ((board.getState()->castling & (CASTLE_BK | CASTLE_BQ)) == 0) // if white can't castle, check for pawn shield
+    {
+        const Bitboard maskB = pawnShield[1][getFile(pieceB)];
+        const int totalShieldersB = popCount(maskB & rankBBs[RANK_7]);
+        const int numShieldersB = popCount(board.getBB(BLACK, PAWN)) & maskB;
+
+        score -= std::max(totalShieldersB - numShieldersB, 0) * PAWN_SHIELD_PENALTY;
+    }
     return score;
 }
 
 template <>
-Score EvalPiece<PAWN>(const Board &board)
+Score EvalPiece<PAWN>(const Board& board)
 {
     Score score = 0;
 
@@ -126,10 +182,9 @@ Score EvalPiece<PAWN>(const Board &board)
         bool isolatedPawn = !(isolatedPawnBB[piece] & pawnWAll);
 
         if (passedPawn)
-            score +=
-                PASSED_PAWN_BONUS +
-                20 *
-                    (6 - getRank(piece)); // bonus for passed pawns and extra for the rank it's on (to encorage pushing)
+            score += PASSED_PAWN_BONUS +
+                     20 * (getRank(piece) -
+                           RANK_2); // bonus for passed pawns and extra for the rank it's on (to encorage pushing)
         if (isolatedPawn)
             score += passedPawn ? ISOLATED_PAWN_PENALTY >> 1
                                 : ISOLATED_PAWN_PENALTY; // halve isolated penalty if also a passed pawn
@@ -146,8 +201,8 @@ Score EvalPiece<PAWN>(const Board &board)
         if (passedPawn)
             score -=
                 PASSED_PAWN_BONUS +
-                20 *
-                    (6 - getRank(piece)); // bonus for passed pawns and extra for the rank it's on (to encorage pushing)
+                20 * (RANK_7 -
+                      getRank(piece)); // bonus for passed pawns and extra for the rank it's on (to encorage pushing)
         if (isolatedPawn)
             score -= passedPawn ? ISOLATED_PAWN_PENALTY >> 1
                                 : ISOLATED_PAWN_PENALTY; // halve isolated penalty if also a passed pawn
@@ -157,7 +212,7 @@ Score EvalPiece<PAWN>(const Board &board)
 }
 
 template <EvalType type>
-Score Evaluate(Board &board)
+Score Evaluate(Board& board)
 {
     PROFILE_FUNC();
 
@@ -169,19 +224,17 @@ Score Evaluate(Board &board)
 
     score += board.getPawnMaterial() + board.getNonPawnMaterial(); // score material
 
-    score += MOVING_BONUS * (board.whiteToMove ? 1 : -1); // add small bonus to side that is going to move
-
     return score * (board.whiteToMove ? 1 : -1);
 }
 
 template <>
-Score Eval<FULL>(Board &board)
+Score Eval<FULL>(Board& board)
 {
     return Evaluate<FULL>(board);
 }
 
 template <>
-Score Eval<FAST>(Board &board)
+Score Eval<FAST>(Board& board)
 {
     return Evaluate<FAST>(board);
 }
