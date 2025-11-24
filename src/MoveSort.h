@@ -21,6 +21,7 @@
 
 #define PV_BONUS 30000
 #define KILLER_MOVE_BONUS 8000
+#define COUNTERMOVE_BONUS 4000
 #define MAX_HISTORY 1000
 
 struct MoveVal
@@ -37,6 +38,7 @@ struct MoveVal
 
 extern Move killerMoves[MAX_PLY][2]; // each ply can have two killer moves
 extern int moveHistory[2][64][64];   // History for [isBlack][from][to]
+extern Move counterMove[64][64];
 
 inline bool isKillerMove(unsigned char ply, Move m)
 {
@@ -67,7 +69,7 @@ inline void addHistoryPenalty(bool isBlack, Move m, int depth)
         penalty + moveHistory[isBlack][m.from()][m.to()] * std::abs(penalty) / MAX_HISTORY;
 }
 
-inline Score Mvv_Lva_Score(const Board& board, Move m)
+inline Score Mvv_Lva_Score(const Board &board, Move m)
 {
     Bitboard attacked = board.getAttacked(~board.sideToMove);
     bool isVictimDefended = (sqrToBB(m.to()) & attacked) != 0;
@@ -78,9 +80,9 @@ inline Score Mvv_Lva_Score(const Board& board, Move m)
            (isVictimDefended ? MVV_LVA_ATTACKER_MULTI_BAD : MVV_LVA_ATTACKER_MULTI_GOOD);
 }
 
-extern MoveVal ScoreMove(const Board& board, Move m);
+extern MoveVal ScoreMove(const Board &board, Move m);
 
-extern MoveVal ScoreMoveQ(const Board& board, Move m);
+extern MoveVal ScoreMoveQ(const Board &board, Move m);
 
 /**
  * @brief Sorts moves for qsearch
@@ -88,11 +90,11 @@ extern MoveVal ScoreMoveQ(const Board& board, Move m);
  * @param board
  * @param moves
  */
-inline void SortMovesQ(const Board& board, MoveList* moves);
+inline void SortMovesQ(const Board &board, MoveList *moves);
 
-extern void SortMovesQ(const Board& board, MoveList* moves, Move best);
+extern void SortMovesQ(const Board &board, MoveList *moves, Move best);
 
-extern void SortMoves(const Board& board, MoveList* moves);
+extern void SortMoves(const Board &board, MoveList *moves);
 
-extern void SortMoves(const Board& board, MoveList* moves, Move prev);
+extern void SortMoves(const Board &board, MoveList *moves, Move prev);
 #endif

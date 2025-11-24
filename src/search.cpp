@@ -31,7 +31,7 @@ unsigned long long orderingNodes;
 unsigned long long maxNodes;
 unsigned long long maxTime;
 unsigned long long startTime;
-static TranspositionTable* tTable =
+static TranspositionTable *tTable =
     new (std::align_val_t(64)) TranspositionTable(1024 * 1024 * 64); // transposition table with a size of 64 MB
 
 bool isDone;
@@ -69,7 +69,7 @@ inline Score mateCorrectTT(Score s, unsigned char ply)
     return isWin(s) ? s - ply : (isLoss(s) ? s + ply : s);
 }
 
-void UpdatePV(PVLine* line, Move move, PVLine* prev)
+void UpdatePV(PVLine *line, Move move, PVLine *prev)
 {
     prev->moves[0] = move;
     for (unsigned int i = 0; i < line->len; i++)
@@ -80,7 +80,7 @@ void UpdatePV(PVLine* line, Move move, PVLine* prev)
     prev->len = line->len + 1;
 }
 
-std::string GetMoveListString(PVLine* l)
+std::string GetMoveListString(PVLine *l)
 {
     std::string moves;
     for (int i = 0; i < l->len; i++)
@@ -91,14 +91,14 @@ std::string GetMoveListString(PVLine* l)
     return moves;
 }
 
-Score qsearch(Board& board, int ply, Score alpha, Score beta)
+Score qsearch(Board &board, int ply, Score alpha, Score beta)
 {
     PROFILE_FUNC();
     numQNodes++;
 
     // probe tt
 
-    TranspositionEntry* entry = tTable->GetEntry(board.getHash());
+    TranspositionEntry *entry = tTable->GetEntry(board.getHash());
     Move bestEntryMove = 0;
     if (entry)
     {
@@ -192,7 +192,7 @@ Score qsearch(Board& board, int ply, Score alpha, Score beta)
 }
 
 template <NodeType node>
-Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* prevLine)
+Score search(Board &board, int depth, int ply, Score alpha, Score beta, PVLine *prevLine)
 {
     if (isDone)
         return 0;
@@ -220,7 +220,7 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
 
     Move bestEntryMove = 0;
 
-    TranspositionEntry* entry = tTable->GetEntry(board.getHash());
+    TranspositionEntry *entry = tTable->GetEntry(board.getHash());
 
     if (entry)
     {
@@ -307,10 +307,7 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
         line.len = 0;
     }
 
-    if (bestEntryMove.getMove())
-        SortMoves(board, &moves, bestEntryMove);
-    else
-        SortMoves(board, &moves);
+    SortMoves(board, &moves, bestEntryMove);
 
     Score bestS = -INF;
     Move bestM = 0;
@@ -394,6 +391,10 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
                         addHistoryPenalty(!board.whiteToMove, penaltyMove, depth);
                 }
             }
+            if (!move.isType<CAPTURE>())
+            {
+                counterMove[board.getState()->move.from()][board.getState()->move.to()] = move;
+            }
 
             if (!isDone) // don't save on incomplete search
                 tTable->SetEntry(board.getHash(), mateAdjustTT(score, ply), depth, NodeBound::Lower, move);
@@ -431,7 +432,7 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
     return bestS;
 }
 
-Score iterativeDeepening(Board& board, unsigned int depth, unsigned int nodes, unsigned int movetime)
+Score iterativeDeepening(Board &board, unsigned int depth, unsigned int nodes, unsigned int movetime)
 {
     startTime = getTime();
 
@@ -461,6 +462,10 @@ Score iterativeDeepening(Board& board, unsigned int depth, unsigned int nodes, u
     maxNodes = nodes;
 
     BoardState state;
+
+    auto *entry = tTable->GetEntry(board.getHash());
+    if (entry)
+        prevBestMove = entry->move;
 
     for (unsigned int d = 1; d <= depth; d++)
     {
@@ -526,7 +531,7 @@ Score iterativeDeepening(Board& board, unsigned int depth, unsigned int nodes, u
     return bestScore;
 }
 
-Move startSearch(Board& board, unsigned int depth, unsigned int nodes, unsigned int movetime)
+Move startSearch(Board &board, unsigned int depth, unsigned int nodes, unsigned int movetime)
 {
     isDone = false;
 
