@@ -97,6 +97,9 @@ void Interface::run()
                 int depth = 0;
                 int nodes = 0;
                 int movetime = 0;
+                int remaining_time = 0;
+                int wtime = 0;
+                int btime = 0;
                 do
                 {
                     if (word == "depth")
@@ -114,9 +117,19 @@ void Interface::run()
                         parse >> word;
                         nodes = atoi(word.c_str());
                     }
+                    else if (word == "wtime")
+                    {
+                        parse >> word;
+                        wtime = atoi(word.c_str());
+                    }
+                    else if (word == "btime")
+                    {
+                        parse >> word;
+                        btime = atoi(word.c_str());
+                    }
                 } while (parse >> word);
 
-                engine.go(depth, nodes, movetime);
+                engine.go(depth, nodes, movetime, wtime, btime);
             }
         }
         else if (word == "makemove")

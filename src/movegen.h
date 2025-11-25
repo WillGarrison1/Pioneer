@@ -9,4 +9,7 @@
 template <MoveType type>
 extern void generateMoves(Board &board, MoveList *list);
 
+template <PieceType pieceType>
+extern void generatePieceMoves(const Board &board, MoveList *list);
+
 #endif // MOVEGEN_H

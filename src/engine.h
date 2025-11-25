@@ -24,7 +24,7 @@ public:
         board->setFen(fen, &states[0]);
     }
 
-    void go(unsigned int depth, unsigned int nodes, unsigned int movetime);
+    void go(unsigned int depth, unsigned int nodes, unsigned int movetime, unsigned int wtime, unsigned int btime);
     void goPerft(unsigned int depth);
 
     void eval();

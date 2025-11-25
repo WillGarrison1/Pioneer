@@ -1,6 +1,7 @@
 #include <cmath>
 #include <cstring>
 #include <iostream>
+#include <algorithm>
 
 #include "search.h"
 
@@ -230,15 +231,20 @@ Score search(Board &board, int depth, int ply, Score alpha, Score beta, PVLine *
             Score corrected = mateCorrectTT(entry->score, ply);
             if (entry->getNodeBound() == NodeBound::Exact)
             {
-                return corrected;
+                if (board.isValidMove(entry->move))
+                    return corrected;
             }
-            if (entry->getNodeBound() == NodeBound::Upper && corrected <= alpha)
+            if (entry->getNodeBound() == NodeBound::Upper)
             {
-                return corrected;
+                if (corrected <= alpha && board.isValidMove(entry->move))
+                    return corrected;
+                beta = corrected;    
             }
-            if (entry->getNodeBound() == NodeBound::Lower && corrected >= beta)
+            if (entry->getNodeBound() == NodeBound::Lower)
             {
-                return corrected;
+                if (corrected >= beta && board.isValidMove(entry->move))
+                    return corrected;
+                alpha = corrected;
             }
         }
 
@@ -531,9 +537,25 @@ Score iterativeDeepening(Board &board, unsigned int depth, unsigned int nodes, u
     return bestScore;
 }
 
-Move startSearch(Board &board, unsigned int depth, unsigned int nodes, unsigned int movetime)
+Move startSearch(Board &board, unsigned int depth, unsigned int nodes, unsigned int movetime, unsigned int remaining_time)
 {
     isDone = false;
+
+    if (remaining_time > 0)
+    {
+        float maxTime = (float)remaining_time / 25.0f;
+
+        MoveList mlist;
+        generateMoves<ALL_MOVES>(board, &mlist);
+        if (mlist.size > 30)
+            maxTime *= 1.5;
+        else if (mlist.size < 10)
+            maxTime *= 0.75;
+        else
+            maxTime *= 0.9;
+        
+        movetime = (unsigned int)std::min(maxTime, (float)remaining_time * 0.2f); // use at most 20% of remaining time
+    }
 
     tTable->IncrementAge();
     Score eval = iterativeDeepening(board, depth, nodes, movetime);

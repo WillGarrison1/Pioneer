@@ -435,6 +435,50 @@ void Board::undoNullMove()
     state = state->prev;
 }
 
+bool Board::isValidMove(Move move)
+{
+    PROFILE_FUNC();
+
+    Piece piece = board[move.from()];
+    if (piece == EMPTY || getColor(piece) != sideToMove)
+        return false;
+
+    PieceType pieceType = getType(piece);
+    MoveList tempMoveList;
+
+    switch (pieceType)
+    {
+    case PAWN:
+        generatePieceMoves<PAWN>(*this, &tempMoveList);
+        break;
+    case KNIGHT:
+        generatePieceMoves<KNIGHT>(*this, &tempMoveList);
+        break;
+    case BISHOP:
+        generatePieceMoves<BISHOP>(*this, &tempMoveList);
+        break;
+    case ROOK:
+        generatePieceMoves<ROOK>(*this, &tempMoveList);
+        break;
+    case QUEEN:
+        generatePieceMoves<QUEEN>(*this, &tempMoveList);
+        break;
+    case KING:
+        generatePieceMoves<KING>(*this, &tempMoveList);
+        break;
+    default:
+        return false;
+    }
+
+    for (int i = 0; i < tempMoveList.size; i++)
+    {
+        if (tempMoveList[i].getMove() == move.getMove())
+            return true;
+    }
+
+    return false;
+}
+
 unsigned int Board::getRepetition()
 {
     Key zobrist = state->zobristHash;

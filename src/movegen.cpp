@@ -410,5 +410,46 @@ void generateMoves(Board& board, MoveList* list)
     generateKingMoves<type>(board, list);
 }
 
+template <>
+void generatePieceMoves<PAWN>(const Board& board, MoveList* list)
+{
+    MovegenMasks masks = { -1ULL, 0ULL, 0ULL };
+    generatePawnMoves<ALL_MOVES>(board, list, &masks);
+}
+
+template <>
+void generatePieceMoves<KNIGHT>(const Board& board, MoveList* list)
+{
+    MovegenMasks masks = { -1ULL, 0ULL, 0ULL };
+    generateKnightMoves<ALL_MOVES>(board, list, &masks);
+}
+
+template <>
+void generatePieceMoves<BISHOP>(const Board& board, MoveList* list)
+{
+    MovegenMasks masks = { -1ULL, 0ULL, 0ULL };
+    generateBishopMoves<ALL_MOVES>(board, list, &masks);
+}
+
+template <>
+void generatePieceMoves<ROOK>(const Board& board, MoveList* list)
+{
+    MovegenMasks masks = { -1ULL, 0ULL, 0ULL };
+    generateRookMoves<ALL_MOVES>(board, list, &masks);
+}
+
+template <>
+void generatePieceMoves<QUEEN>(const Board& board, MoveList* list)
+{
+    MovegenMasks masks = { -1ULL, 0ULL, 0ULL };
+    generateQueenMoves<ALL_MOVES>(board, list, &masks);
+}
+
+template <>
+void generatePieceMoves<KING>(const Board& board, MoveList* list)
+{
+    generateKingMoves<ALL_MOVES>(board, list);
+}
+
 template void generateMoves<ALL_MOVES>(Board& board, MoveList* list);
 template void generateMoves<CAPTURE>(Board& board, MoveList* list);

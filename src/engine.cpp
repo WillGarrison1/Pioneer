@@ -51,9 +51,10 @@ void Engine::makemove(Move move)
     }
 }
 
-void Engine::go(unsigned int depth, unsigned int nodes, unsigned int movetime)
+void Engine::go(unsigned int depth, unsigned int nodes, unsigned int movetime, unsigned int wtime, unsigned int btime)
 {
-    Move best = startSearch(*board, depth, nodes, movetime);
+    unsigned int remaining_time = board->whiteToMove ? wtime : btime;
+    Move best = startSearch(*board, depth, nodes, movetime, remaining_time);
     std::cout << "Best Move: " << best.toString() << std::endl;
 }
 

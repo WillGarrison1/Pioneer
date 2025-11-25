@@ -58,6 +58,8 @@ class Board
     void makeNullMove(BoardState* state);
     void undoNullMove();
 
+    bool isValidMove(Move move);
+
     /**
      * @brief checks if a move causes check
      *
