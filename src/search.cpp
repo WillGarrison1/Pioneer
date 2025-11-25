@@ -186,8 +186,8 @@ Score qsearch(Board &board, int ply, Score alpha, Score beta)
             }
         }
     }
-
-    tTable->SetEntry(board.getHash(), mateAdjustTT(pat, ply), 0, NodeBound::Upper, bestM);
+    if (bestM.getMove() != 0)
+        tTable->SetEntry(board.getHash(), mateAdjustTT(pat, ply), 0, NodeBound::Upper, bestM);
 
     return pat;
 }
@@ -222,9 +222,9 @@ Score search(Board &board, int depth, int ply, Score alpha, Score beta, PVLine *
     Move bestEntryMove = 0;
 
     TranspositionEntry *entry = tTable->GetEntry(board.getHash());
-
-    if (entry)
-    {
+    
+    if (entry && board.isValidMove(entry->move))
+    {   
         ttHits++;
         if (entry->depth >= depth)
         {
@@ -236,7 +236,7 @@ Score search(Board &board, int depth, int ply, Score alpha, Score beta, PVLine *
             }
             if (entry->getNodeBound() == NodeBound::Upper)
             {
-                if (corrected <= alpha && board.isValidMove(entry->move))
+                if (corrected <= alpha)
                     return corrected;
                 beta = corrected;    
             }
@@ -319,7 +319,7 @@ Score search(Board &board, int depth, int ply, Score alpha, Score beta, PVLine *
     Move bestM = 0;
 
     NodeBound nodeBound = NodeBound::Upper;
-
+    Move firstMove;
     for (int i = 0; sorter.size != 0; i++)
     {
         Move move = sorter.Next();
@@ -344,11 +344,15 @@ Score search(Board &board, int depth, int ply, Score alpha, Score beta, PVLine *
                 continue;
         }
 
+        line.len = 0;
+
         board.makeMove(move, &state);
 
         // Late move reductions (LMR)
         Score score;
         bool fullSearch = i == 0; // always full search the first move
+        if (fullSearch)
+            firstMove = move;
 
         if (!fullSearch) // pvs
         {
@@ -422,13 +426,13 @@ Score search(Board &board, int depth, int ply, Score alpha, Score beta, PVLine *
         }
     }
 
-    if (moves.moves[0] == bestM)
+    if (firstMove == bestM)
         pvHits++;
 
     if (moves.size >= 2)
         orderingNodes++;
 
-    if (bestM == 0)               // if we didn't search a move (futility pruned all moves)
+    if (bestM.getMove() == 0)               // if we didn't search a move (futility pruned all moves)
         return Eval<FAST>(board); // return static evaluation
 
     if (!isDone) // don't store in transposition table because we cutoff early (Time cutoff, node cutoff, etc.)
@@ -529,6 +533,34 @@ Score iterativeDeepening(Board &board, unsigned int depth, unsigned int nodes, u
                   << (int)(tTable->GetFull() * 1000) << " time " << getTime() - startTime << " TTHitRate "
                   << (float)ttHits / (float)numNodes << " BetaCutRate " << (float)numBetaCutoffs / (float)numNodes
                   << " PVHitRate " << (float)pvHits / (float)orderingNodes << std::endl;
+        BoardState newState[pv.len];
+        for (int p = 0; p < pv.len; p++)
+        {
+            MoveList pvMoves;
+            generateMoves<ALL_MOVES>(board, &pvMoves);
+            
+            bool found = false;
+
+            
+            for (int j = 0; j < mList.size; j++)
+            {
+                if (pv.moves[p] == pvMoves.moves[j])
+                {
+                    board.makeMove(pvMoves.moves[j], &newState[p]);
+                    found = true;
+                    break;
+                }
+            }
+
+            if (!found)
+                std::cout << "PV Move not found: " << pv.moves[p].toString() << std::endl;
+
+        }
+
+        for (int j = 0; j < pv.len; j++)
+        {
+            board.undoMove();
+        }
 
         prevBestMove = bestMove;
         prevBestScore = bestScore;
