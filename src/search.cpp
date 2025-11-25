@@ -150,15 +150,15 @@ Score qsearch(Board &board, int ply, Score alpha, Score beta)
         }
     }
 
-    SortMovesQ(board, &moves, bestEntryMove);
+    MoveSorter<QUIESCENCE> sorter(board, &moves, bestEntryMove);
 
     PVLine line;
     Move bestM = 0;
     BoardState state;
 
-    for (int i = 0; i < moves.size; i++)
+    for (; sorter.size != 0;)
     {
-        Move m = moves.moves[i];
+        Move m = sorter.Next();
 
         // Delta pruning
         Piece movePiece = board.getSQ(m.from());
@@ -307,17 +307,16 @@ Score search(Board &board, int depth, int ply, Score alpha, Score beta, PVLine *
         line.len = 0;
     }
 
-    SortMoves(board, &moves, bestEntryMove);
+    MoveSorter<NORMAL> sorter(board, &moves, bestEntryMove);
 
     Score bestS = -INF;
     Move bestM = 0;
 
     NodeBound nodeBound = NodeBound::Upper;
 
-    for (int i = 0; i < moves.size; i++)
+    for (int i = 0; sorter.size != 0; i++)
     {
-        Move move = moves.moves[i];
-
+        Move move = sorter.Next();
         int extension = 0;
         bool checkMove = board.isCheckMove(move);
 
@@ -479,14 +478,15 @@ Score iterativeDeepening(Board &board, unsigned int depth, unsigned int nodes, u
         alpha = -INF;
         beta = INF;
 
-        MoveList m;
-        generateMoves<ALL_MOVES>(board, &m);
+        MoveList mList;
+        generateMoves<ALL_MOVES>(board, &mList);
 
-        SortMoves(board, &m, prevBestMove);
-
-        for (int i = 0; i < m.size; i++)
+        MoveSorter<NORMAL> sorter(board, &mList, prevBestMove);
+        
+        for (int i = 0; sorter.size != 0; i++)
         {
-            board.makeMove(m.moves[i], &state);
+            Move m = sorter.Next();
+            board.makeMove(m, &state);
             Score eval = alpha;
 
             if (i > 0)
@@ -508,7 +508,7 @@ Score iterativeDeepening(Board &board, unsigned int depth, unsigned int nodes, u
             if (eval > bestScore)
             {
                 bestScore = eval;
-                bestMove = m.moves[i];
+                bestMove = m;
                 alpha = bestScore;
 
                 UpdatePV(&line, bestMove, &pv);

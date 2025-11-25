@@ -28,11 +28,60 @@ struct MoveVal
 {
     Move m;
     int score;
+};
 
-    MoveVal() = default;
+enum SortType
+{
+    NORMAL,
+    QUIESCENCE
+};
 
-    MoveVal(Move m, int score) : m(m), score(score)
+MoveVal ScoreMove(const Board &board, Move m);
+MoveVal ScoreMoveQ(const Board &board, Move m);
+
+template <SortType S>
+struct MoveSorter
+{
+    MoveVal moveVals[256];
+    unsigned int size;
+
+    MoveSorter(const Board &board, MoveList *mlist, Move best) : size(mlist->size)
     {
+        for (int i = 0; i < size; i++)
+        {
+            if (mlist->moves[i] == best)
+                moveVals[i] = {best, PV_BONUS};
+            else
+            {
+                if constexpr (S == QUIESCENCE)
+                    moveVals[i] = ScoreMoveQ(board, mlist->moves[i]);
+                else
+                    moveVals[i] = ScoreMove(board, mlist->moves[i]);
+            }
+        }
+    }
+
+    ~MoveSorter() = default;
+    Move Next()
+    {
+        int bestIndex = 0;
+        int bestScore = -1000000;
+
+        for (int i = 0; i < size; i++)
+        {
+            if (moveVals[i].score > bestScore)
+            {
+                bestScore = moveVals[i].score;
+                bestIndex = i;
+            }
+        }
+
+        Move bestMove = moveVals[bestIndex].m;
+
+        // Remove the best move from the list
+        moveVals[bestIndex] = moveVals[--size];
+
+        return bestMove;
     }
 };
 
@@ -79,22 +128,4 @@ inline Score Mvv_Lva_Score(const Board &board, Move m)
     return (pieceScores[victimType] * MVV_LVA_VICTIM_MULTI - pieceScores[pieceType]) *
            (isVictimDefended ? MVV_LVA_ATTACKER_MULTI_BAD : MVV_LVA_ATTACKER_MULTI_GOOD);
 }
-
-extern MoveVal ScoreMove(const Board &board, Move m);
-
-extern MoveVal ScoreMoveQ(const Board &board, Move m);
-
-/**
- * @brief Sorts moves for qsearch
- *
- * @param board
- * @param moves
- */
-inline void SortMovesQ(const Board &board, MoveList *moves);
-
-extern void SortMovesQ(const Board &board, MoveList *moves, Move best);
-
-extern void SortMoves(const Board &board, MoveList *moves);
-
-extern void SortMoves(const Board &board, MoveList *moves, Move prev);
 #endif

@@ -86,7 +86,7 @@ constexpr bool operator!=(Move m1, Move m2)
 struct MoveList
 {
     Move moves[256];
-    unsigned char size = 0;
+    int size = 0;
 
     void addMove(Move move)
     {

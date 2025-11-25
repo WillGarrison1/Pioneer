@@ -11,7 +11,7 @@ MoveVal ScoreMove(const Board &board, Move m)
     const Color us = getColor(piece);
     const Move prevMove = board.getState()->move;
 
-    MoveVal v(m, 0);
+    MoveVal v = {m, 0};
 
     if (counterMove[prevMove.from()][prevMove.to()] == m)
     {
@@ -43,7 +43,7 @@ MoveVal ScoreMove(const Board &board, Move m)
 
 MoveVal ScoreMoveQ(const Board &board, Move m)
 {
-    MoveVal v(m, 0);
+    MoveVal v = {m, 0};
     Piece piece = board.getSQ(m.from());
     PieceType pType = getType(piece);
 
@@ -56,46 +56,4 @@ MoveVal ScoreMoveQ(const Board &board, Move m)
         v.score += ATTACKED_PENALTY - (pieceScores[pType] >> 3);
 
     return v;
-}
-
-void SortMovesQ(const Board &board, MoveList *moves, Move best)
-{
-    MoveVal vals[moves->size];
-
-    for (int i = 0; i < moves->size; i++)
-    {
-        if (moves->moves[i] == best)
-            vals[i] = MoveVal(best, PV_BONUS);
-        else
-            vals[i] = ScoreMoveQ(board, moves->moves[i]);
-    }
-
-    std::sort(vals, vals + moves->size, [](const MoveVal &a, const MoveVal &b)
-              { return a.score > b.score; });
-
-    for (int i = 0; i < moves->size; i++)
-    {
-        moves->moves[i] = vals[i].m;
-    }
-}
-
-void SortMoves(const Board &board, MoveList *moves, Move prev)
-{
-    MoveVal vals[moves->size];
-
-    for (int i = 0; i < moves->size; i++)
-    {
-        if (prev == moves->moves[i])
-            vals[i] = MoveVal(prev, PV_BONUS);
-        else
-            vals[i] = ScoreMove(board, moves->moves[i]);
-    }
-
-    std::sort(vals, vals + moves->size, [](const MoveVal &a, const MoveVal &b)
-              { return a.score > b.score; });
-
-    for (int i = 0; i < moves->size; i++)
-    {
-        moves->moves[i] = vals[i].m;
-    }
 }

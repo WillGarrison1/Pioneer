@@ -12,7 +12,7 @@ endif()
 file(GLOB_RECURSE SOURCES "src/*.cpp")
 
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
-    add_compile_options(-O3 -flto -fno-exceptions -march=native -mtune=native)
+    add_compile_options(-O3 -flto -fno-exceptions -march=native -mtune=native -fomit-frame-pointer)
     add_link_options(-flto -Wl,--gc-sections)
 endif()
 
