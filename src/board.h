@@ -8,7 +8,7 @@
 #include "piece.h"
 #include "types.h"
 
-#define MAX_PLY 256
+#define MAX_PLY 1024
 
 static const std::string START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
@@ -192,7 +192,7 @@ class Board
     Color sideToMove; // Side to move
 
   private:
-    unsigned char ply;
+    unsigned short ply;
 
     Bitboard pieceBB[ALL_PIECES + 1]; // Bitboards for each piece type
     Bitboard colorBB[BLACK + 1];      // Bitboards for each color
@@ -201,7 +201,4 @@ class Board
 
     BoardState* state; // Current board state
 };
-
-constexpr static int size = sizeof(Board);
-
 #endif

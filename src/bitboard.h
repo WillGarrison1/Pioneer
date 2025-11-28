@@ -112,7 +112,7 @@ inline Square msb(const Bitboard bb)
     _BitScanReverse64(&index, bb);
     return static_cast<Square>(index);
 #else
-    return static_cast<Square>(__builtin_clzll(bb));
+    return static_cast<Square>(63-__builtin_clzll(bb));
 #endif
 }
 
@@ -134,6 +134,7 @@ constexpr int popCount(const Bitboard bb)
 
 constexpr Bitboard operator>>(const Bitboard b, const Direction d)
 {
+    if (d < 0) return static_cast<unsigned long long>(b) >> static_cast<unsigned long long>(-d);
     return (static_cast<unsigned long long>(b) >> static_cast<unsigned long long>(d));
 }
 

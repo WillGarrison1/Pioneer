@@ -57,7 +57,7 @@ class Move
 
     // Tells if a move is of a type
     template <MoveType T>
-    constexpr bool isType()
+    constexpr bool isType() const
     {
         return type() == T;
     }
@@ -90,6 +90,7 @@ struct MoveList
 
     void addMove(Move move)
     {
+        assert(size < 256);
         moves[size++] = move;
     }
 

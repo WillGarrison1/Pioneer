@@ -5,3 +5,4 @@
 CMakePresets.json
 /util/__pycache__
 lichess_db_standard_rated_2015-08.pgn
+util/runner.py
