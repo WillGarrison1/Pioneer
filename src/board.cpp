@@ -657,13 +657,10 @@ void Board::generateAttackBB(const Color side)
     Bitboard rooks = getBB(side, ROOK);
     Bitboard queens = getBB(side, QUEEN);
 
-    unsigned int checkCount = 0;
     Bitboard attackBB = 0;
 
     attackBB |= shift(pawns & ~fileBBs[FILE_A], forward + WEST);
     attackBB |= shift(pawns & ~fileBBs[FILE_H], forward + EAST);
-
-    Square enemyKingSqr = lsb(enemyKing);
 
     while (knights)
     {

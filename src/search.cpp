@@ -39,7 +39,7 @@ bool isDone;
 
 struct PVLine
 {
-    int len;
+    unsigned int len;
     Move moves[MAX_DEPTH];
 
     PVLine() : len(0)
@@ -49,6 +49,7 @@ struct PVLine
 
 Score bestScore = -INF;
 Move bestMove = 0;
+Move prevBestMove = 0;
 
 inline bool isWin(Score s)
 {
@@ -60,12 +61,12 @@ inline bool isLoss(Score s)
     return s < -MATE + MAX_DEPTH;
 }
 
-inline Score mateAdjustTT(Score s, unsigned char ply)
+inline Score mateToTT(Score s, unsigned char ply)
 {
     return isWin(s) ? s + ply : (isLoss(s) ? s - ply : s);
 }
 
-inline Score mateCorrectTT(Score s, unsigned char ply)
+inline Score ttToMate(Score s, unsigned char ply)
 {
     return isWin(s) ? s - ply : (isLoss(s) ? s + ply : s);
 }
@@ -84,7 +85,7 @@ void UpdatePV(PVLine* line, Move move, PVLine* prev)
 std::string GetMoveListString(PVLine* l)
 {
     std::string moves;
-    for (int i = 0; i < l->len; i++)
+    for (unsigned int i = 0; i < l->len; i++)
     {
         moves += l->moves[i].toString() + " ";
     }
@@ -108,17 +109,12 @@ Score qsearch(Board& board, int ply, Score alpha, Score beta)
     Move bestEntryMove = 0;
     if (entry)
     {
-        Score corrected = mateCorrectTT(entry->score, ply);
-        if (entry->getNodeBound() == NodeBound::Exact)
+        Score corrected = ttToMate(entry->score, ply);
+        if (entry->getNodeBound() == NodeBound::Exact ||
+            (entry->getNodeBound() == NodeBound::Upper && corrected <= alpha) ||
+            (entry->getNodeBound() == NodeBound::Lower && corrected >= beta))
         {
-            return corrected;
-        }
-        if (entry->getNodeBound() == NodeBound::Upper && corrected <= alpha)
-        {
-            return corrected;
-        }
-        if (entry->getNodeBound() == NodeBound::Lower && corrected >= beta)
-        {
+            tTable->SetEntry(board.getHash(), entry->score, entry->depth, entry->getNodeBound(), entry->move);
             return corrected;
         }
 
@@ -184,7 +180,7 @@ Score qsearch(Board& board, int ply, Score alpha, Score beta)
             {
                 if (score >= beta)
                 {
-                    tTable->SetEntry(board.getHash(), mateAdjustTT(score, ply), 0, NodeBound::Lower, m);
+                    tTable->SetEntry(board.getHash(), mateToTT(score, ply), 0, NodeBound::Lower, m);
                     return score;
                 }
                 alpha = score;
@@ -192,7 +188,7 @@ Score qsearch(Board& board, int ply, Score alpha, Score beta)
         }
     }
     if (bestM.getMove() != 0)
-        tTable->SetEntry(board.getHash(), mateAdjustTT(pat, ply), 0, NodeBound::Upper, bestM);
+        tTable->SetEntry(board.getHash(), mateToTT(pat, ply), 0, NodeBound::Upper, bestM);
 
     return pat;
 }
@@ -224,7 +220,7 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
     if (board.getState()->move50rule == 100)
         return 0; // 50 fullmoves have been made
 
-    constexpr bool isPVNode = node == PVNode;
+    constexpr bool isPVNode = node == PVNode || node == RootNode;
 
     Move bestEntryMove = 0;
 
@@ -235,20 +231,18 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
         ttHits++;
         if (entry->depth >= depth)
         {
-            Score corrected = mateCorrectTT(entry->score, ply);
-            if (entry->getNodeBound() == NodeBound::Exact)
+            Score corrected = ttToMate(entry->score, ply);
+            if (!isPVNode && (entry->getNodeBound() == NodeBound::Exact ||
+                              (entry->getNodeBound() == NodeBound::Upper && corrected <= alpha) ||
+                              (entry->getNodeBound() == NodeBound::Lower && corrected >= beta)))
             {
+                tTable->SetEntry(board.getHash(), entry->score, entry->depth, entry->getNodeBound(), entry->move);
                 return corrected;
             }
-            if (entry->getNodeBound() == NodeBound::Upper)
+            else if (isPVNode)
             {
-                if (!isPVNode && corrected <= alpha)
-                    return corrected;
-            }
-            if (entry->getNodeBound() == NodeBound::Lower)
-            {
-                if (!isPVNode && corrected >= beta)
-                    return corrected;
+                if (entry->getNodeBound() == NodeBound::Lower)
+                    alpha = std::max(alpha, corrected);
             }
         }
 
@@ -312,9 +306,14 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
         board.makeNullMove(&state);
         Score nullScore = -search<CUTNode>(board, depth - NULL_DEPTH, ply + 1, -beta, -beta + 1, &line);
         board.undoNullMove();
-        if (nullScore > beta)
+        if (nullScore >= beta)
+        {
             return nullScore;
+        }
     }
+
+    if (node == RootNode)
+        bestEntryMove = prevBestMove;
 
     MoveSorter<NORMAL> sorter(board, &moves, bestEntryMove);
 
@@ -378,7 +377,10 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
         if (fullSearch)
         {
             // Depth Extensions/reductions
-            score = -search<node>(board, depth + extension - 1, ply + 1, -beta, -alpha, &line);
+            if constexpr (node == RootNode)
+                score = -search<PVNode>(board, depth + extension - 1, ply + 1, -beta, -alpha, &line);
+            else
+                score = -search<node>(board, depth + extension - 1, ply + 1, -beta, -alpha, &line);
         }
         board.undoMove();
 
@@ -416,7 +418,7 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
             }
 
             if (!isDone) // don't save on incomplete search
-                tTable->SetEntry(board.getHash(), mateAdjustTT(score, ply), depth, NodeBound::Lower, move);
+                tTable->SetEntry(board.getHash(), mateToTT(score, ply), depth, NodeBound::Lower, move);
             numBetaCutoffs++;
             return score;
         }
@@ -433,6 +435,14 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
             }
             bestS = score;
             bestM = move;
+
+            if (node == RootNode)
+            {
+                bestMove = move;
+                bestScore = score;
+                std::cout << "info depth " << depth << " curmov " << bestMove.toString() << " score cp " << bestScore
+                          << " nodes " << numNodes + numQNodes << " pv " << GetMoveListString(prevLine) << std::endl;
+            }
         }
     }
 
@@ -446,7 +456,7 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
         return Eval<FAST>(board); // return static evaluation
 
     if (!isDone) // don't store in transposition table because we cutoff early (Time cutoff, node cutoff, etc.)
-        tTable->SetEntry(board.getHash(), mateAdjustTT(bestS, ply), depth, nodeBound, bestM);
+        tTable->SetEntry(board.getHash(), mateToTT(bestS, ply), depth, nodeBound, bestM);
 
     return bestS;
 }
@@ -458,8 +468,8 @@ Score iterativeDeepening(Board& board, unsigned int depth, unsigned int nodes, u
     PVLine pv;
     pv.len = 0;
 
-    Move prevBestMove = 0;
-    Score prevBestScore = -INF;
+    Score prevBestScore = 0;
+    prevBestMove = 0;
 
     bestMove = 0;
     bestScore = -INF;
@@ -480,68 +490,51 @@ Score iterativeDeepening(Board& board, unsigned int depth, unsigned int nodes, u
     maxTime = movetime;
     maxNodes = nodes;
 
-    BoardState state;
-
-    auto* entry = tTable->GetEntry(board.getHash());
-    if (entry)
-        prevBestMove = entry->move;
-
     for (unsigned int d = 1; d <= depth; d++)
     {
         bestMove = 0;
         bestScore = -INF;
 
-        Score alpha, beta;
-        alpha = -INF;
-        beta = INF;
+        Score delta = 50;
+        Score alpha = prevBestScore - delta;
+        Score beta = prevBestScore + delta;
 
-        MoveList mList;
-        generateMoves<ALL_MOVES>(board, &mList);
-
-        MoveSorter<NORMAL> sorter(board, &mList, prevBestMove);
-
-        for (int i = 0; sorter.size != 0; i++)
+        Score eval;
+        while (true)
         {
-            Move m = sorter.Next();
-            board.makeMove(m, &state);
-            Score eval = alpha;
-            PVLine line;
-
-            if (i > 0)
-                eval = -search<CUTNode>(board, d - 1, 0, -alpha - 1, -alpha, &line);
-            line.len = 0;
-            bool fullSearch = eval > alpha;
-
-            if (i == 0 || fullSearch)
-                eval = -search<PVNode>(board, d - 1, 0, -beta, -alpha, &line);
-            board.undoMove();
-
             if (isDone)
+                break;
+
+            eval = search<RootNode>(board, d, 0, alpha, beta, &pv);
+
+            if (eval > alpha && eval < beta)
+                break;
+            else if (eval < alpha)
             {
-                bestScore = prevBestScore;
-                bestMove = prevBestMove;
-                return bestScore;
+                delta *= 2;
+                beta = alpha;
+                alpha -= delta;
             }
-
-            if (eval > bestScore)
+            else
             {
-                bestScore = eval;
-                bestMove = m;
-                alpha = bestScore;
-
-                UpdatePV(&line, bestMove, &pv);
-
-                std::cout << "info depth " << d << " curmov " << bestMove.toString() << " score cp " << bestScore
-                          << " nodes " << numNodes + numQNodes << " pv " << GetMoveListString(&pv) << std::endl;
+                delta *= 2;
+                alpha = beta;
+                beta += delta;
             }
         }
 
-        std::cout << "info depth " << d << " curmov " << bestMove.toString() << " score cp " << bestScore << " nodes "
+        if (isDone)
+        {
+            bestMove = prevBestMove;
+            bestScore = prevBestScore;
+            return prevBestScore;
+        }
+
+        std::cout << "info depth " << d << " curmov " << bestMove.toString() << " score cp " << eval << " nodes "
                   << numNodes + numQNodes << " pv " << GetMoveListString(&pv) << "hashfull "
                   << (int)(tTable->GetFull() * 1000) << " time " << getTime() - startTime << " TTHitRate "
                   << (float)ttHits / (float)numNodes << " BetaCutRate " << (float)numBetaCutoffs / (float)numNodes
                   << " PVHitRate " << (float)pvHits / (float)orderingNodes << std::endl;
-        BoardState newState[pv.len];
 
         prevBestMove = bestMove;
         prevBestScore = bestScore;

@@ -97,7 +97,6 @@ void Interface::run()
                 int depth = 0;
                 int nodes = 0;
                 int movetime = 0;
-                int remaining_time = 0;
                 int wtime = 0;
                 int btime = 0;
                 do

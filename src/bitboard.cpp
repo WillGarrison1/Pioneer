@@ -145,8 +145,6 @@ void initBBs()
 
         // Compute Pawn Shields
 
-        Bitboard shield = 0ULL;
-
         if (rank == 0)
         {
             if (file == FILE_A)

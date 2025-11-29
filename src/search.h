@@ -10,6 +10,7 @@ enum NodeType
 {
     PVNode,
     CUTNode,
+    RootNode
 };
 
 /**
@@ -22,6 +23,7 @@ enum NodeType
  * @param movetime how much time is remaining for the bot in a game (if zero then default to movetime)
  * @return The best move
  */
-extern Move startSearch(Board &board, unsigned int depth, unsigned int nodes, unsigned int movetime, unsigned int remaining_time);
+extern Move startSearch(Board& board, unsigned int depth, unsigned int nodes, unsigned int movetime,
+                        unsigned int remaining_time);
 
 #endif

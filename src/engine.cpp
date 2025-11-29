@@ -43,7 +43,7 @@ void Engine::makemove(Move move)
     {
         Move m = legal.moves[i];
         if (m.to() == move.to() && m.from() == move.from() &&
-            (m.type() == PROMOTION && move.promotion() == m.promotion() || m.type() != PROMOTION))
+            ((m.type() == PROMOTION && move.promotion() == m.promotion()) || (m.type() != PROMOTION)))
         {
             board->makeMove(m, &states[board->getPly() + 1]);
             break;

@@ -47,7 +47,7 @@ struct MoveSorter
 
     MoveSorter(const Board &board, MoveList *mlist, Move best) : size(mlist->size)
     {
-        for (int i = 0; i < size; i++)
+        for (unsigned int i = 0; i < size; i++)
         {
             if (mlist->moves[i] == best)
                 moveVals[i] = {best, PV_BONUS};
@@ -67,7 +67,7 @@ struct MoveSorter
         int bestIndex = 0;
         int bestScore = -1000000;
 
-        for (int i = 0; i < size; i++)
+        for (unsigned int i = 0; i < size; i++)
         {
             if (moveVals[i].score > bestScore)
             {
