@@ -30,6 +30,7 @@ BoardState::BoardState()
     non_pawn_material = 0;
 
     zobristHash = 0ULL;
+    repetition = 1;
 }
 
 BoardState::BoardState(BoardState* prev)
@@ -45,6 +46,8 @@ BoardState::BoardState(BoardState* prev)
     this->pawn_material = prev->pawn_material;
     this->zobristHash = prev->zobristHash;
     this->move50rule = prev->move50rule + 1;
+
+    this->repetition = 1;
 }
 
 BoardState::~BoardState()
@@ -414,18 +417,20 @@ void Board::makeNullMove(BoardState* newState)
     newState->prev = state;
     state = newState;
 
-    newState->move = 0;
-    newState->checkers = 0;
+    state->move = 0;
+    state->checkers = 0;
 
-    newState->enPassantSquare = SQ_NONE; //* note: only set if en passant can be played
+    state->enPassantSquare = SQ_NONE; //* note: only set if en passant can be played
 
     if (state->enPassantSquare != SQ_NONE) // if enPassant square from last move, remove it from zobrist
-        newState->zobristHash ^= enPassantHash[getFile(getEnPassantSqr())];
+        state->zobristHash ^= enPassantHash[getFile(getEnPassantSqr())];
 
     whiteToMove = !whiteToMove;
     sideToMove = ~sideToMove;
 
-    newState->zobristHash ^= isBlackHash;
+    state->zobristHash ^= isBlackHash;
+
+    state->repetition = getRepetition();
 }
 
 void Board::undoNullMove()

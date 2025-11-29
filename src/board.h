@@ -84,8 +84,7 @@ class Board
     void computePins(Bitboard& pinnedS, Bitboard& pinnedD);
 
     // Move stuff
-    constexpr Move createMove(Square from, Square to, MoveType mType = QUIET, PieceType promote = EMPTY,
-                              CastlingRights castle = NONE_CASTLE) const
+    constexpr Move createMove(Square from, Square to, MoveType mType = QUIET, PieceType promote = KNIGHT) const
     {
         return Move(from, to, mType, promote);
     }

@@ -17,7 +17,7 @@
 #define MAX_DEPTH 256
 #define FUTILITY_DEPTH 4
 #define LMR_INDEX 2
-#define LMR_DEPTH 2
+#define LMR_DEPTH 3
 #define NULL_DEPTH 3
 #define IIR_DEPTH 6 // internal iterative reduction depth
 #define FUTILITY_MARGIN(DEPTH) 80 + 120 * DEPTH
@@ -98,6 +98,11 @@ Score qsearch(Board& board, int ply, Score alpha, Score beta)
     numQNodes++;
 
     // probe tt
+
+    if (board.getState()->repetition == 3)
+        return 0; // draw by repetition
+    if (board.getState()->move50rule == 100)
+        return 0; // 50-move draw
 
     TranspositionEntry* entry = tTable->GetEntry(board.getHash());
     Move bestEntryMove = 0;
@@ -331,11 +336,6 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
         // if (isPVNode && move.to() == board.getState()->move.to()) // recapture extension
         //     extension = 1;
 
-        if (!isPVNode && depth <= 8 && i > 3 + depth * depth)
-        {
-            continue;
-        }
-
         // Futility pruning
         if (!isPVNode && depth < FUTILITY_DEPTH && move.type() == QUIET && !checkMove)
         {
@@ -356,7 +356,18 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
         {
             int reductions = 1;
             if (depth > LMR_DEPTH && i > LMR_INDEX && !checkMove) // lmr
-                reductions = depth / 5 + 1;
+            {
+                int R_depth = depth / 4;
+
+                // R2: Step-wise increase based on move index (i)
+                int R_index = 0;
+                if (i >= 8)
+                    R_index = 2; // Aggressive reduction for very late moves
+                else if (i >= 4)
+                    R_index = 1;
+
+                reductions = R_depth + R_index + 1;
+            }
 
             score = -search<CUTNode>(board, depth - reductions, ply + 1, -alpha - 1, -alpha, &line);
 
@@ -494,7 +505,6 @@ Score iterativeDeepening(Board& board, unsigned int depth, unsigned int nodes, u
             Move m = sorter.Next();
             board.makeMove(m, &state);
             Score eval = alpha;
-
             PVLine line;
 
             if (i > 0)

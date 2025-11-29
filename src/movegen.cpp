@@ -342,7 +342,7 @@ void generateCastlingMoves(const Board& board, MoveList* list)
         if ((castleRights & CASTLE_WK) &&                          // has castle right
             (open & castleBBs[CASTLE_WK]) == castleBBs[CASTLE_WK]) // no obstructions between king and rook
         {
-            list->addMove(board.createMove(SQ_E1, SQ_G1, CASTLE, EMPTY, CASTLE_WK));
+            list->addMove(board.createMove(SQ_E1, SQ_G1, CASTLE, EMPTY));
         }
         // Long castle
         if ((castleRights & CASTLE_WQ) && // has castle right
@@ -350,7 +350,7 @@ void generateCastlingMoves(const Board& board, MoveList* list)
              castleBBs[CASTLE_WQ]) &&            // no attacked squares or pieces where king moves through
             (blockers & sqrToBB(SQ_B1)) == 0ULL) // no piecce next to rook
         {
-            list->addMove(board.createMove(SQ_E1, SQ_C1, CASTLE, EMPTY, CASTLE_WQ));
+            list->addMove(board.createMove(SQ_E1, SQ_C1, CASTLE, EMPTY));
         }
     }
     else
@@ -358,13 +358,13 @@ void generateCastlingMoves(const Board& board, MoveList* list)
         // Short castle
         if ((castleRights & CASTLE_BK) && ((open & castleBBs[CASTLE_BK]) == castleBBs[CASTLE_BK]))
         {
-            list->addMove(board.createMove(SQ_E8, SQ_G8, CASTLE, EMPTY, CASTLE_BK));
+            list->addMove(board.createMove(SQ_E8, SQ_G8, CASTLE, EMPTY));
         }
         // Long castle
         if ((castleRights & CASTLE_BQ) && ((open & castleBBs[CASTLE_BQ]) == castleBBs[CASTLE_BQ]) &&
             (blockers & sqrToBB(SQ_B8)) == 0ULL)
         {
-            list->addMove(board.createMove(SQ_E8, SQ_C8, CASTLE, EMPTY, CASTLE_BQ));
+            list->addMove(board.createMove(SQ_E8, SQ_C8, CASTLE, EMPTY));
         }
     }
 }

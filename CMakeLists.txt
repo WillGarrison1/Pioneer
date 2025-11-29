@@ -12,8 +12,8 @@ endif()
 file(GLOB_RECURSE SOURCES "src/*.cpp")
 
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
-    add_compile_options(-O3 -flto -fno-exceptions -march=native -mtune=native -fomit-frame-pointer -ffunction-sections -fdata-sections)
-    add_link_options(-flto -Wl,--gc-sections -Wl,--strip-all)
+    add_compile_options(-O3 -flto -fno-exceptions -march=x86-64-v3 -mtune=generic -fomit-frame-pointer -ffunction-sections -fdata-sections -static)
+    add_link_options(-flto -Wl,--gc-sections -Wl,--strip-all -static)
 endif()
 
 add_executable(PioneerV4 ${SOURCES})
