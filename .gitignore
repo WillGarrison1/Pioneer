@@ -1,6 +1,7 @@
 /build/
 /.vscode/
 /out
+/tune
 /CMakePresets*
 CMakePresets.json
 /util/__pycache__

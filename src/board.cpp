@@ -156,6 +156,8 @@ void Board::makeMove(Move move, BoardState* newState)
     PROFILE_FUNC();
 
     // Initialize new board state
+    *newState = *state;
+
     newState->attacks[0] = 0ULL;
     newState->attacks[1] = 0ULL;
 
@@ -163,12 +165,8 @@ void Board::makeMove(Move move, BoardState* newState)
     newState->checkers = 0;
     newState->captured = board[move.to()];
 
-    newState->castling = state->castling;
     newState->enPassantSquare = SQ_NONE; //* note: only set if en passant can be played
-    newState->non_pawn_material = state->non_pawn_material;
-    newState->pawn_material = state->pawn_material;
-    newState->zobristHash = state->zobristHash;
-    newState->move50rule = state->move50rule + 1;
+    newState->move50rule++;
 
     if (state->enPassantSquare != SQ_NONE) // if enPassant square from last move, remove it from zobrist
         newState->zobristHash ^= enPassantHash[getFile(getEnPassantSqr())];
@@ -552,7 +550,7 @@ void Board::setFen(const std::string& fen, BoardState* newState)
 
     ply = 0;
     state = newState;
-    state->zobristHash = 0ULL;
+    *state = {};
 
     std::stringstream ss(fen);
     std::string pos, color, castle, enPassant, noActionRule50;

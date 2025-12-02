@@ -36,7 +36,7 @@ void initBBs()
 
     memset(_bitboardRays, 0, sizeof(_bitboardRays));
 
-    // Initialize moves and attacks
+    // Initialize moves and attacks (commonly uses manhattan distance to check for board wraps)
     for (Square sqr = SQ_A1; sqr <= SQ_H8; sqr++)
     {
         // Initialize knight moves for each square
@@ -150,7 +150,7 @@ void initBBs()
             if (file == FILE_A)
             {
                 pawnShield[0][file] = sqrToBB(SQ_A2) | sqrToBB(SQ_B2) | sqrToBB(SQ_A3) | sqrToBB(SQ_B3);
-                pawnShield[1][file] = sqrToBB(SQ_A7) | sqrToBB(SQ_G7) | sqrToBB(SQ_A6) | sqrToBB(SQ_B6);
+                pawnShield[1][file] = sqrToBB(SQ_A7) | sqrToBB(SQ_B7) | sqrToBB(SQ_A6) | sqrToBB(SQ_B6);
             }
             else if (file == FILE_H)
             {
@@ -161,12 +161,12 @@ void initBBs()
             {
                 Bitboard king = sqrToBB(sqr);
 
-                Bitboard straight = shift(king, SOUTH_EAST) | shift(king, SOUTH_WEST) | shift(king, SOUTH);
-                straight |= shift(king, SOUTH);
+                Bitboard straight = shift(king, NORTH_EAST) | shift(king, NORTH_WEST) | shift(king, NORTH);
+                straight |= shift(straight, NORTH);
 
                 pawnShield[0][file] = straight;
 
-                straight = shift(king, SOUTH * 3); // rank 3 -> rank 6
+                straight = shift(straight, NORTH * 4); // rank 2/3 -> rank 6/7
                 pawnShield[1][file] = straight;
             }
         }

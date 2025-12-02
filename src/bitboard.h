@@ -92,7 +92,7 @@ inline bool getBit(const Bitboard bb, const Square sq)
     return bb & (1ULL << sq);
 }
 
-inline Square lsb(const Bitboard bb)
+constexpr Square lsb(const Bitboard bb)
 {
     assert(bb != 0);
 #if _MSC_VER
@@ -112,11 +112,11 @@ inline Square msb(const Bitboard bb)
     _BitScanReverse64(&index, bb);
     return static_cast<Square>(index);
 #else
-    return static_cast<Square>(63-__builtin_clzll(bb));
+    return static_cast<Square>(63 - __builtin_clzll(bb));
 #endif
 }
 
-inline Square popLSB(Bitboard& bb)
+constexpr Square popLSB(Bitboard& bb)
 {
     Square bit = lsb(bb);
     bb &= bb - 1;
@@ -134,7 +134,8 @@ constexpr int popCount(const Bitboard bb)
 
 constexpr Bitboard operator>>(const Bitboard b, const Direction d)
 {
-    if (d < 0) return static_cast<unsigned long long>(b) >> static_cast<unsigned long long>(-d);
+    if (d < 0)
+        return static_cast<unsigned long long>(b) >> static_cast<unsigned long long>(-d);
     return (static_cast<unsigned long long>(b) >> static_cast<unsigned long long>(d));
 }
 

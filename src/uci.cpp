@@ -1,5 +1,7 @@
 #include "uci.h"
 
+#include "search.h"
+#include "transposition.h"
 #include "types.h"
 #include <iostream>
 #include <sstream>
@@ -35,8 +37,17 @@ void Interface::run()
         else if (input == "isready")
             std::cout << "readyok\n";
 
+        else if (input == "ucinewgame")
+            tTable->Clear();
+
         else if (input == "d")
             engine.print();
+        else if (word == "tune")
+        {
+            std::string sNum;
+
+            // add variables to tune here
+        }
 
         else if (word == "position")
         {

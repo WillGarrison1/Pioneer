@@ -43,7 +43,6 @@ struct TranspositionBucket
     char padding[2]; // pad to 32 bytes
 };
 
-
 static_assert(sizeof(TranspositionEntry) == 10, "TranspositionEntry is not 10 bytes!");
 static_assert(sizeof(TranspositionBucket) == 32, "TranspositionBucket is not 32 bytes!");
 class TranspositionTable
@@ -69,11 +68,15 @@ class TranspositionTable
 
     float GetFull(); // gets how full the table is, from 0-1
 
+    void Clear();
+
   private:
     TranspositionBucket* buckets;
     unsigned char age;
     unsigned long long numBuckets;
 };
+
+extern TranspositionTable* tTable;
 
 extern Key boardHashes[64][(KING | BLACK) + 1];
 extern Key isBlackHash;

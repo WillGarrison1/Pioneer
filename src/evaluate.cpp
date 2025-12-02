@@ -11,12 +11,12 @@
 
 #define KING_ATTACKED -10 // penalty for squares attacked adjacent to king
 
-#define PAWN_SHIELD_PENALTY -25
-#define REACH_MULTIPLIER 3        // multiplier for reach (number of defended squares) bonue
+#define PAWN_SHIELD_PENALTY -15   // penalty for each absence of a pawn in from of the king after castling
+#define REACH_MULTIPLIER 3        // multiplier for reach (number of defended squares) bonus
 #define DOUBLED_PAWNS_PENALTY -20 // penalty for doubled pawns
 #define ISOLATED_PAWN_PENALTY -30 // penalty for isolated pawns
 #define PASSED_PAWN_BONUS 50      // bonus for passed pawns
-#define BISHOP_PAIR_BONUS 40
+#define BISHOP_PAIR_BONUS 40      // bonus for bishop pairs
 
 /**
  * @brief Evaluates a Piece from White's perspective
@@ -79,8 +79,8 @@ Score EvalPiece<BISHOP>(const Board& board)
     score -= popCount(pieceB & defendedB) * DEFENDED_BONUS;
     score -= popCount(pieceB & defendedW) * ATTACKED_PENALTY;
 
-    score += (Score)(popCount(pieceW) == 2) * BISHOP_PAIR_BONUS;
-    score -= (Score)(popCount(pieceB) == 2) * BISHOP_PAIR_BONUS;
+    score += (popCount(pieceW) == 2) * BISHOP_PAIR_BONUS;
+    score -= (popCount(pieceB) == 2) * BISHOP_PAIR_BONUS;
 
     while (pieceW)
     {
@@ -113,27 +113,29 @@ Score EvalPiece<KING>(const Board& board)
     score -= GetPSQValue<KING, BLACK>(pieceB);
 
     Bitboard attackedKingWSquares = kingMoves[pieceW] & defendedB;
-
     score += popCount(attackedKingWSquares) * KING_ATTACKED;
 
     Bitboard attackedKingBSquares = kingMoves[pieceB] & defendedW;
-
     score -= popCount(attackedKingBSquares) * KING_ATTACKED;
+
     if ((board.getState()->castling & (CASTLE_WK | CASTLE_WQ)) == 0) // if white can't castle, check for pawn shield
     {
         const Bitboard maskW = pawnShield[0][getFile(pieceW)];
-        const int totalShieldersW =
-            popCount(maskW & rankBBs[RANK_2]); // get number of possible shielded pawns by getting the width of the mask
-        const int numShieldersW = popCount(board.getBB(WHITE, PAWN)) & maskW;
+
+        // get number of possible shielded pawns by getting the width of the mask
+        const int totalShieldersW = popCount(maskW & rankBBs[RANK_2]);
+        const int numShieldersW = popCount(board.getBB(WHITE, PAWN) & maskW);
 
         score += std::max(totalShieldersW - numShieldersW, 0) * PAWN_SHIELD_PENALTY;
     }
 
-    if ((board.getState()->castling & (CASTLE_BK | CASTLE_BQ)) == 0) // if white can't castle, check for pawn shield
+    if ((board.getState()->castling & (CASTLE_BK | CASTLE_BQ)) == 0) // if black can't castle, check for pawn shield
     {
         const Bitboard maskB = pawnShield[1][getFile(pieceB)];
+
+        // get number of possible shielded pawns by getting the width of the mask
         const int totalShieldersB = popCount(maskB & rankBBs[RANK_7]);
-        const int numShieldersB = popCount(board.getBB(BLACK, PAWN)) & maskB;
+        const int numShieldersB = popCount(board.getBB(BLACK, PAWN) & maskB);
 
         score -= std::max(totalShieldersB - numShieldersB, 0) * PAWN_SHIELD_PENALTY;
     }

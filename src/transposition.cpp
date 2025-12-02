@@ -8,6 +8,9 @@ Key isBlackHash;
 Key castleRightsHash[16];
 Key enPassantHash[8];
 
+TranspositionTable* tTable =
+    new (std::align_val_t(64)) TranspositionTable(1024 * 1024 * 64); // transposition table with a size of 64 MB
+
 void TranspositionEntry::Set(Key key, Score score, Move move, unsigned char depth, unsigned char age, NodeBound bound)
 {
     this->key = key >> 48;
@@ -96,6 +99,12 @@ float TranspositionTable::GetFull()
     }
 
     return (float)valid / ((float)numBuckets * BUCKET_SIZE);
+}
+
+void TranspositionTable::Clear()
+{
+    age = 0;
+    std::memset(this->buckets, 0, this->numBuckets * sizeof(TranspositionBucket));
 }
 
 void InitZobrist()

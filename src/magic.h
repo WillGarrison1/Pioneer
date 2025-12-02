@@ -7,7 +7,7 @@
 
 struct Magic
 {
-    Bitboard *moves;
+    Bitboard* moves;
     Bitboard mask;
 
     Magic() : moves(nullptr), mask(0)
@@ -18,7 +18,7 @@ struct Magic
     {
     }
 
-    inline Bitboard GetMoves(Bitboard blockers)
+    inline Bitboard GetMoves(const Bitboard blockers)
     {
         return moves[_pext_u64(blockers, mask)];
     }
@@ -29,12 +29,12 @@ extern Magic bishopMagics[64];
 
 void InitMagics();
 
-inline Bitboard GetRookMoves(Bitboard blockers, Square sqr)
+inline Bitboard GetRookMoves(const Bitboard blockers, const Square sqr)
 {
     return rookMagics[sqr].GetMoves(blockers);
 }
 
-inline Bitboard GetBishopMoves(Bitboard blockers, Square sqr)
+inline Bitboard GetBishopMoves(const Bitboard blockers, const Square sqr)
 {
     return bishopMagics[sqr].GetMoves(blockers);
 }
