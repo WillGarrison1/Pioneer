@@ -15,6 +15,4 @@ private:
     Engine engine;
 };
 
-
-
 #endif
