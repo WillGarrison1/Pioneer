@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstring>
 #include <iostream>
@@ -17,12 +18,8 @@
 #define MAX_DEPTH 256
 #define FUTILITY_DEPTH 4
 
-constexpr int lmr_index = 3;               // the first index lmr will be used on
-constexpr int lmr_depth = 5;               // the minimum depth lmr can be used
-constexpr int lmr_max_depth_reduction = 4; // the maximum depth a searched can be reduced for the depth
-constexpr int lmr_max_move_reduction = 5;  // the maximum depth a searched can be reduced for the move index
-constexpr int lmr_move_factor = 3;         // indexReduction = index >> lmr_move_factor
-constexpr int lmr_depth_factor = 2;        // depthReduction = depth >> lmr_depth_factor
+constexpr int lmr_index = 2; // the first index lmr will be used on
+constexpr int lmr_depth = 2; // the minimum depth lmr can be used
 
 constexpr Score aspirationStartingDelta = 50;
 constexpr float aspirationMultiplier = 2.2;
@@ -43,6 +40,15 @@ unsigned long long maxTime;
 unsigned long long startTime;
 
 bool isDone;
+
+constexpr auto logTable = [] {
+    std::array<float, 256> table{};
+    table[0] = 0;
+    for (int i = 1; i < 256; i++)
+        table[i] = std::log(i);
+
+    return table;
+}();
 
 struct PVLine
 {
@@ -98,9 +104,7 @@ void UpdatePV(PVLine* line, Move move, PVLine* prev)
  */
 constexpr int LMRReduction(int depth, int moveNum)
 {
-    const int depthR = std::min(depth >> lmr_depth_factor, lmr_max_depth_reduction);
-    const int moveR = std::min(moveNum >> lmr_move_factor, lmr_max_move_reduction);
-    return std::min(depthR + moveR, depth);
+    return 0.75f + logTable[depth] * logTable[moveNum] / 2.25f;
 }
 
 std::string GetMoveListString(PVLine* l)
@@ -273,6 +277,16 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
     {
         // Internal Iterative Reduction if no hashmove found (reduce depth by one)
         depth--;
+
+        // Internal Iterative Deepening
+    }
+    else if (isPVNode && depth > 5)
+    {
+        PVLine tmpPv;
+        search<CUTNode>(board, depth >> 1, ply, alpha, beta, &tmpPv);
+
+        if (tmpPv.len > 0)
+            bestEntryMove = tmpPv.moves[0];
     }
 
     if (depth == 0)
@@ -517,20 +531,13 @@ Score iterativeDeepening(Board& board, unsigned int depth, unsigned int nodes, u
 
             eval = search<RootNode>(board, d, 0, alpha, beta, &pv);
 
+            delta *= aspirationMultiplier;
             if (eval > alpha && eval < beta)
                 break;
-            else if (eval < alpha)
-            {
-                delta *= aspirationMultiplier;
-                beta = alpha;
+            else if (eval <= alpha)
                 alpha -= delta;
-            }
             else
-            {
-                delta *= aspirationMultiplier;
-                alpha = beta;
                 beta += delta;
-            }
         }
 
         if (isDone)

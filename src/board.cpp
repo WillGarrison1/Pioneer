@@ -26,11 +26,13 @@ BoardState::BoardState()
     checkers = 0;
     move50rule = 0;
 
+    captured = EMPTY;
     pawn_material = 0;
     non_pawn_material = 0;
 
     zobristHash = 0ULL;
     repetition = 1;
+    prev = nullptr;
 }
 
 BoardState::BoardState(BoardState* prev)
@@ -48,6 +50,7 @@ BoardState::BoardState(BoardState* prev)
     this->move50rule = prev->move50rule + 1;
 
     this->repetition = 1;
+    this->prev = prev;
 }
 
 BoardState::~BoardState()
