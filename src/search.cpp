@@ -22,9 +22,9 @@ constexpr int lmr_index = 2; // the first index lmr will be used on
 constexpr int lmr_depth = 2; // the minimum depth lmr can be used
 
 constexpr Score aspirationStartingDelta = 50;
-constexpr float aspirationMultiplier = 2.2;
+constexpr float aspirationMultiplier = 2.0f;
 
-#define NULL_DEPTH 5
+#define NULL_DEPTH 3
 #define IIR_DEPTH 6 // internal iterative reduction depth
 #define FUTILITY_MARGIN(DEPTH) 80 + 120 * DEPTH
 #define DELTA 200
@@ -41,7 +41,8 @@ unsigned long long startTime;
 
 bool isDone;
 
-constexpr auto logTable = [] {
+constexpr auto logTable = []
+{
     std::array<float, 256> table{};
     table[0] = 0;
     for (int i = 1; i < 256; i++)
@@ -84,7 +85,7 @@ inline Score ttToMate(Score s, unsigned char ply)
     return isWin(s) ? s - ply : (isLoss(s) ? s + ply : s);
 }
 
-void UpdatePV(PVLine* line, Move move, PVLine* prev)
+void UpdatePV(PVLine *line, Move move, PVLine *prev)
 {
     prev->moves[0] = move;
     for (unsigned int i = 0; i < line->len; i++)
@@ -107,7 +108,7 @@ constexpr int LMRReduction(int depth, int moveNum)
     return 0.75f + logTable[depth] * logTable[moveNum] / 2.25f;
 }
 
-std::string GetMoveListString(PVLine* l)
+std::string GetMoveListString(PVLine *l)
 {
     std::string moves;
     for (unsigned int i = 0; i < l->len; i++)
@@ -118,7 +119,7 @@ std::string GetMoveListString(PVLine* l)
     return moves;
 }
 
-Score qsearch(Board& board, int ply, Score alpha, Score beta)
+Score qsearch(Board &board, int ply, Score alpha, Score beta)
 {
     PROFILE_FUNC();
     numQNodes++;
@@ -130,7 +131,7 @@ Score qsearch(Board& board, int ply, Score alpha, Score beta)
     if (board.getState()->move50rule == 100)
         return 0; // 50-move draw
 
-    TranspositionEntry* entry = tTable->GetEntry(board.getHash());
+    TranspositionEntry *entry = tTable->GetEntry(board.getHash());
     Move bestEntryMove = 0;
     if (entry)
     {
@@ -219,7 +220,7 @@ Score qsearch(Board& board, int ply, Score alpha, Score beta)
 }
 
 template <NodeType node>
-Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* prevLine)
+Score search(Board &board, int depth, int ply, Score alpha, Score beta, PVLine *prevLine)
 {
     if (isDone)
         return 0;
@@ -249,7 +250,7 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
 
     Move bestEntryMove = 0;
 
-    TranspositionEntry* entry = tTable->GetEntry(board.getHash());
+    TranspositionEntry *entry = tTable->GetEntry(board.getHash());
 
     if (entry)
     {
@@ -277,11 +278,10 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
     {
         // Internal Iterative Reduction if no hashmove found (reduce depth by one)
         depth--;
-
-        // Internal Iterative Deepening
     }
-    else if (isPVNode && depth > 5)
+    else if (isPVNode && depth > 8)
     {
+        // Internal Iterative Deepening
         PVLine tmpPv;
         search<CUTNode>(board, depth >> 1, ply, alpha, beta, &tmpPv);
 
@@ -334,12 +334,12 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
     // null move pruning
 
     int numEnemyPieces = popCount(board.getBB(ALL_PIECES, ~board.sideToMove) & ~board.getBB(PAWN));
-    if (!isPVNode && numEnemyPieces > 0 && board.getNumChecks() == 0 && depth >= NULL_DEPTH + 1 && !isLoss(beta))
+    if (!isPVNode && numEnemyPieces > 0 && board.getNumChecks() == 0 && depth >= NULL_DEPTH && !isLoss(beta))
     {
         PVLine line;
 
         board.makeNullMove(&state);
-        Score nullScore = -search<CUTNode>(board, depth - NULL_DEPTH, ply + 1, -beta, -beta + 1, &line);
+        Score nullScore = -search<CUTNode>(board, depth * 2 / 3 - 1, ply + 1, -beta, -beta + 1, &line);
         board.undoNullMove();
         if (nullScore >= beta)
         {
@@ -485,7 +485,7 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
     return bestS;
 }
 
-Score iterativeDeepening(Board& board, unsigned int depth, unsigned int nodes, unsigned int movetime)
+Score iterativeDeepening(Board &board, unsigned int depth, unsigned int nodes, unsigned int movetime)
 {
     startTime = getTime();
 
@@ -560,7 +560,7 @@ Score iterativeDeepening(Board& board, unsigned int depth, unsigned int nodes, u
     return bestScore;
 }
 
-Move startSearch(Board& board, unsigned int depth, unsigned int nodes, unsigned int movetime,
+Move startSearch(Board &board, unsigned int depth, unsigned int nodes, unsigned int movetime,
                  unsigned int remaining_time)
 {
     isDone = false;
