@@ -725,7 +725,9 @@ Bitboard Board::getAttackers(Square sqr)
 void Board::computeAttackedBBs()
 {
     generateAttackBB(~sideToMove);
+    #ifndef PERFT
     generateAttackBB(sideToMove);
+    #endif
 }
 
 void Board::computePins(Bitboard& pinnedS, Bitboard& pinnedD)

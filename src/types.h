@@ -1,7 +1,8 @@
 #ifndef TYPES_H
 #define TYPES_H
 
-// #define MAGIC_GEN
+// #define MAGIC_GEN (does nothing right now)
+// #define PERFT (enable to get faster perft times)
 
 enum Color : unsigned int
 {

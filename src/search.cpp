@@ -435,7 +435,7 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
                         addHistoryPenalty(!board.whiteToMove, penaltyMove, depth);
                 }
             }
-            if (!move.isType<CAPTURE>())
+            if (board.getSQ(move.to()) != EMPTY)
             {
                 counterMove[board.getState()->move.from()][board.getState()->move.to()] = move;
             }
