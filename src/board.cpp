@@ -35,7 +35,7 @@ BoardState::BoardState()
     prev = nullptr;
 }
 
-BoardState::BoardState(BoardState* prev)
+BoardState::BoardState(BoardState *prev)
 {
     this->attacks[0] = 0ULL;
     this->attacks[1] = 0ULL;
@@ -109,7 +109,7 @@ void Board::movePiece(Square from, Square to)
     board[to] = piece;
 }
 
-void Board::addPieceZobrist(Piece piece, Square square, Key* key)
+void Board::addPieceZobrist(Piece piece, Square square, Key *key)
 {
     const PieceType pieceType = getType(piece);
     const Color color = getColor(piece);
@@ -122,7 +122,7 @@ void Board::addPieceZobrist(Piece piece, Square square, Key* key)
     board[square] = piece;
 }
 
-void Board::removePieceZobrist(Square square, Key* key)
+void Board::removePieceZobrist(Square square, Key *key)
 {
     const Piece piece = board[square];
     const PieceType pieceType = getType(piece);
@@ -136,7 +136,7 @@ void Board::removePieceZobrist(Square square, Key* key)
     board[square] = EMPTY;
 }
 
-void Board::movePieceZobrist(Square from, Square to, Key* key)
+void Board::movePieceZobrist(Square from, Square to, Key *key)
 {
     const Piece piece = board[from];
     const PieceType pieceType = getType(piece);
@@ -154,7 +154,7 @@ void Board::movePieceZobrist(Square from, Square to, Key* key)
     board[to] = piece;
 }
 
-void Board::makeMove(Move move, BoardState* newState)
+void Board::makeMove(Move move, BoardState *newState)
 {
     PROFILE_FUNC();
 
@@ -412,7 +412,7 @@ void Board::undoMove()
     ply--;
 }
 
-void Board::makeNullMove(BoardState* newState)
+void Board::makeNullMove(BoardState *newState)
 {
     *newState = *state;
     newState->prev = state;
@@ -421,10 +421,10 @@ void Board::makeNullMove(BoardState* newState)
     state->move = 0;
     state->checkers = 0;
 
-    state->enPassantSquare = SQ_NONE; //* note: only set if en passant can be played
-
     if (state->enPassantSquare != SQ_NONE) // if enPassant square from last move, remove it from zobrist
         state->zobristHash ^= enPassantHash[getFile(getEnPassantSqr())];
+
+    state->enPassantSquare = SQ_NONE; // note: only set if en passant can be played
 
     whiteToMove = !whiteToMove;
     sideToMove = ~sideToMove;
@@ -489,7 +489,7 @@ unsigned int Board::getRepetition()
 {
     Key zobrist = state->zobristHash;
 
-    BoardState* currState = state->prev;
+    BoardState *currState = state->prev;
     while (currState != nullptr)
     {
         if (currState->zobristHash == zobrist)
@@ -547,7 +547,7 @@ void Board::clear()
     }
 }
 
-void Board::setFen(const std::string& fen, BoardState* newState)
+void Board::setFen(const std::string &fen, BoardState *newState)
 {
     clear();
 
@@ -725,12 +725,12 @@ Bitboard Board::getAttackers(Square sqr)
 void Board::computeAttackedBBs()
 {
     generateAttackBB(~sideToMove);
-    #ifndef PERFT
+#ifndef PERFT
     generateAttackBB(sideToMove);
-    #endif
+#endif
 }
 
-void Board::computePins(Bitboard& pinnedS, Bitboard& pinnedD)
+void Board::computePins(Bitboard &pinnedS, Bitboard &pinnedD)
 {
     pinnedS = pinnedD = 0ULL;
 

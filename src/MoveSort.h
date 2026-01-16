@@ -23,6 +23,7 @@
 #define KILLER_MOVE_BONUS 8000
 #define COUNTERMOVE_BONUS 4000
 #define MAX_HISTORY 1000
+#define MAX_CAPTURE_HISTORY 10000
 
 struct MoveVal
 {
@@ -85,8 +86,9 @@ struct MoveSorter
     }
 };
 
-extern Move killerMoves[MAX_PLY][2]; // each ply can have two killer moves
-extern int moveHistory[2][64][64];   // History for [isBlack][from][to]
+extern Move killerMoves[MAX_PLY][2];  // each ply can have two killer moves
+extern int moveHistory[2][64][64];    // History for [isBlack][from][to]
+extern int captureHistory[2][64][64]; // same as moveHistory
 extern Move counterMove[64][64];
 
 inline bool isKillerMove(unsigned char ply, Move m)
@@ -113,9 +115,24 @@ inline void addHistoryBonus(bool isBlack, Move m, int depth)
 inline void addHistoryPenalty(bool isBlack, Move m, int depth)
 {
 
-    const int penalty = std::clamp(depth * depth, -MAX_HISTORY, MAX_HISTORY);
+    const int penalty = std::clamp(depth * depth * 10, -MAX_HISTORY, MAX_HISTORY);
     moveHistory[isBlack][m.from()][m.to()] -=
         penalty + moveHistory[isBlack][m.from()][m.to()] * std::abs(penalty) / MAX_HISTORY;
+}
+
+inline void addCaptureBonus(bool isBlack, Move m, int depth)
+{
+    int clampedBonus = std::clamp(depth * depth * 10, -MAX_CAPTURE_HISTORY, MAX_CAPTURE_HISTORY);
+    captureHistory[isBlack][m.from()][m.to()] +=
+        clampedBonus - captureHistory[isBlack][m.from()][m.to()] * std::abs(clampedBonus) / MAX_CAPTURE_HISTORY;
+}
+
+inline void addCapturePenalty(bool isBlack, Move m, int depth)
+{
+
+    const int penalty = std::clamp(depth * depth, -MAX_CAPTURE_HISTORY, MAX_CAPTURE_HISTORY);
+    captureHistory[isBlack][m.from()][m.to()] -=
+        penalty + captureHistory[isBlack][m.from()][m.to()] * std::abs(penalty) / MAX_CAPTURE_HISTORY;
 }
 
 inline Score Mvv_Lva_Score(const Board &board, Move m)

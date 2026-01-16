@@ -41,7 +41,8 @@ unsigned long long startTime;
 
 bool isDone;
 
-constexpr auto logTable = [] {
+constexpr auto logTable = []
+{
     std::array<float, 256> table{};
     table[0] = 0;
     for (int i = 1; i < 256; i++)
@@ -84,7 +85,7 @@ inline Score ttToMate(Score s, unsigned char ply)
     return isWin(s) ? s - ply : (isLoss(s) ? s + ply : s);
 }
 
-void UpdatePV(PVLine* line, Move move, PVLine* prev)
+void UpdatePV(PVLine *line, Move move, PVLine *prev)
 {
     prev->moves[0] = move;
     for (unsigned int i = 0; i < line->len; i++)
@@ -107,7 +108,7 @@ constexpr int LMRReduction(int depth, int moveNum)
     return 0.75f + logTable[depth] * logTable[moveNum] / 2.25f;
 }
 
-std::string GetMoveListString(PVLine* l)
+std::string GetMoveListString(PVLine *l)
 {
     std::string moves;
     for (unsigned int i = 0; i < l->len; i++)
@@ -118,7 +119,7 @@ std::string GetMoveListString(PVLine* l)
     return moves;
 }
 
-Score qsearch(Board& board, int ply, Score alpha, Score beta)
+Score qsearch(Board &board, int ply, Score alpha, Score beta)
 {
     PROFILE_FUNC();
     numQNodes++;
@@ -130,7 +131,7 @@ Score qsearch(Board& board, int ply, Score alpha, Score beta)
     if (board.getState()->move50rule == 100)
         return 0; // 50-move draw
 
-    TranspositionEntry* entry = tTable->GetEntry(board.getHash());
+    TranspositionEntry *entry = tTable->GetEntry(board.getHash());
     Move bestEntryMove = 0;
     if (entry)
     {
@@ -206,6 +207,17 @@ Score qsearch(Board& board, int ply, Score alpha, Score beta)
                 if (score >= beta)
                 {
                     tTable->SetEntry(board.getHash(), mateToTT(score, ply), 0, NodeBound::Lower, m);
+
+                    addCaptureBonus(!board.whiteToMove, m, 1); // add capture bonus here (saying depth of 1 for quiescence search because zero doesn't change anything)
+
+                    for (int p = 0; p < moves.size; p++)
+                    {
+                        Move penaltyMove = moves.moves[p];
+
+                        if (penaltyMove.isType<CAPTURE>() && penaltyMove != m)
+                            addCapturePenalty(!board.whiteToMove, penaltyMove, 1);
+                    }
+
                     return score;
                 }
                 alpha = score;
@@ -219,7 +231,7 @@ Score qsearch(Board& board, int ply, Score alpha, Score beta)
 }
 
 template <NodeType node>
-Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* prevLine)
+Score search(Board &board, int depth, int ply, Score alpha, Score beta, PVLine *prevLine)
 {
     if (isDone)
         return 0;
@@ -239,17 +251,18 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
 
     prevLine->len = 0;
 
-    if (board.getState()->repetition == 3)
+    constexpr bool isPVNode = node == PVNode || node == RootNode;
+    constexpr bool isRootNode = node == RootNode;
+
+    if (!isRootNode && board.getState()->repetition == 3)
         return 0; // draw by repetition
 
-    if (board.getState()->move50rule == 100)
+    if (!isRootNode && board.getState()->move50rule == 100)
         return 0; // 50 fullmoves have been made
-
-    constexpr bool isPVNode = node == PVNode || node == RootNode;
 
     Move bestEntryMove = 0;
 
-    TranspositionEntry* entry = tTable->GetEntry(board.getHash());
+    TranspositionEntry *entry = tTable->GetEntry(board.getHash());
 
     if (entry)
     {
@@ -438,6 +451,15 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
             if (board.getSQ(move.to()) != EMPTY)
             {
                 counterMove[board.getState()->move.from()][board.getState()->move.to()] = move;
+                addCaptureBonus(!board.whiteToMove, move, depth); // add move history bonus
+
+                for (int p = 0; p < moves.size; p++)
+                {
+                    Move penaltyMove = moves.moves[p];
+
+                    if (penaltyMove.isType<CAPTURE>() && penaltyMove != move)
+                        addCapturePenalty(!board.whiteToMove, penaltyMove, depth);
+                }
             }
 
             if (!isDone) // don't save on incomplete search
@@ -451,6 +473,12 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
             {
                 nodeBound = NodeBound::Exact;
                 alpha = score;
+
+                if (move.isType<QUIET>())
+                    addHistoryBonus(!board.whiteToMove, move, depth); // add move history bonus
+                else if (board.getSQ(move.to()) != EMPTY)
+                    addCaptureBonus(!board.whiteToMove, move, depth); // add move history bonus
+
                 if (isPVNode)
                 {
                     UpdatePV(&line, move, prevLine);
@@ -484,7 +512,7 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
     return bestS;
 }
 
-Score iterativeDeepening(Board& board, unsigned int depth, unsigned int nodes, unsigned int movetime)
+Score iterativeDeepening(Board &board, unsigned int depth, unsigned int nodes, unsigned int movetime)
 {
     startTime = getTime();
 
@@ -534,9 +562,14 @@ Score iterativeDeepening(Board& board, unsigned int depth, unsigned int nodes, u
             if (eval > alpha && eval < beta)
                 break;
             else if (eval <= alpha)
-                alpha -= delta;
+            {
+                beta = alpha + 1;
+                alpha = std::max(alpha - delta, -INF);
+            }
             else
+            {
                 beta += delta;
+            }
         }
 
         if (isDone)
@@ -559,7 +592,7 @@ Score iterativeDeepening(Board& board, unsigned int depth, unsigned int nodes, u
     return bestScore;
 }
 
-Move startSearch(Board& board, unsigned int depth, unsigned int nodes, unsigned int movetime,
+Move startSearch(Board &board, unsigned int depth, unsigned int nodes, unsigned int movetime,
                  unsigned int remaining_time)
 {
     isDone = false;

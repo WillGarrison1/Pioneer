@@ -2,6 +2,7 @@
 
 alignas(64) Move killerMoves[MAX_PLY][2]; // each ply can have two killer moves
 alignas(64) int moveHistory[2][64][64];   // History for [isBlack][from][to]
+alignas(64) int captureHistory[2][64][64];
 alignas(64) Move counterMove[64][64];
 
 MoveVal ScoreMove(const Board &board, Move m)
@@ -23,7 +24,16 @@ MoveVal ScoreMove(const Board &board, Move m)
 
     if (m.type() == CAPTURE) // bonus for captures
     {
-        v.score += Mvv_Lva_Score(board, m) + CAPTURE_BONUS;
+        if (m.to() == board.getEnPassantSqr())
+        {
+            v.score += 4 * pieceScores[PAWN] + CAPTURE_BONUS;
+        }
+        else
+        {
+            v.score += 4 * pieceScores[getType(board.getSQ(m.to()))] + CAPTURE_BONUS;
+        }
+
+        v.score += captureHistory[!board.whiteToMove][m.from()][m.to()];
     }
 
     if (m.type() == PROMOTION) // bonus for promotions
@@ -47,7 +57,15 @@ MoveVal ScoreMoveQ(const Board &board, Move m)
     Piece piece = board.getSQ(m.from());
     PieceType pType = getType(piece);
 
-    v.score += Mvv_Lva_Score(board, m);
+    if (m.to() == board.getEnPassantSqr())
+    {
+        v.score += 4 * pieceScores[PAWN] + CAPTURE_BONUS;
+    }
+    else
+    {
+        v.score += 4 * pieceScores[getType(board.getSQ(m.to()))] + CAPTURE_BONUS;
+    }
+    v.score += captureHistory[!board.whiteToMove][m.from()][m.to()];
 
     if (m.type() == PROMOTION) // bonus for promotions
         v.score += pieceScores[getType(m.promotion())] + PROMOTION_BONUS;
