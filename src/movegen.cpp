@@ -316,15 +316,26 @@ template <MoveType mType>
 void generateKingMoves(const Board& board, MoveList* list)
 {
     PROFILE_FUNC();
-    const Bitboard open = (mType == ALL_MOVES ? ~board.getBB(board.sideToMove) : board.getBB(~board.sideToMove)) &
-                          ~board.getAttacked(~board.sideToMove);
     const Square from = lsb(board.getBB(board.sideToMove, KING));
+    const Bitboard open = ~board.getAttacked(~board.sideToMove);
 
-    Bitboard moves = kingMoves[from] & open;
+    Bitboard enemy = board.getBB(~board.sideToMove) & open;
+
+    if constexpr (mType == ALL_MOVES)
+    {
+        Bitboard empty = board.getBB(EMPTY) & open;
+        Bitboard moves = kingMoves[from] & empty;
+        while (moves)
+        {
+            Square to = popLSB(moves);
+            list->addMove(Move(from, to, QUIET));
+        }
+    }
+    Bitboard moves = kingMoves[from] & enemy;
     while (moves)
     {
         Square to = popLSB(moves);
-        list->addMove(Move(from, to, (MoveType)((board.getBB(~board.sideToMove) & sqrToBB(to)) != 0)));
+        list->addMove(Move(from, to, CAPTURE));
     }
 }
 

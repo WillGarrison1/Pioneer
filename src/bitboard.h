@@ -6,6 +6,9 @@
 #ifdef _MSC_VER
 #include <intrin.h>
 #endif
+#ifdef __GNUC__
+#include <x86intrin.h>
+#endif
 
 const Bitboard emptyBB = 0ULL;
 const Bitboard fullBB = 0xFFFFFFFFFFFFFFFFULL;
@@ -116,10 +119,10 @@ inline Square msb(const Bitboard bb)
 #endif
 }
 
-constexpr Square popLSB(Bitboard& bb)
+inline Square popLSB(Bitboard& bb)
 {
     Square bit = lsb(bb);
-    bb &= bb - 1;
+    bb = __blsr_u64(bb);
     return bit;
 }
 

@@ -22,18 +22,24 @@ class Move
     constexpr Move() : m_move(0)
     {
     }
-    constexpr Move(Square from, Square to, MoveType type = QUIET, PieceType promotion = KNIGHT)
+    constexpr Move(const Square from, const Square to, const MoveType type = QUIET, const PieceType promotion = KNIGHT)
         : m_move((from) | (to << 6) | (type << 12) | ((promotion - 2) << 14))
     {
     }
 
-    Move(unsigned short move) : m_move(move)
+    constexpr Move(unsigned short move) : m_move(move)
     {
     }
-    Move(const Move& move) : m_move(move.m_move)
+    constexpr Move(const Move& move) : m_move(move.m_move)
     {
     }
     Move(const std::string str);
+
+    constexpr Move& operator=(const Move& other)
+    {
+        m_move = other.m_move;
+        return *this;
+    }
 
     constexpr Square from() const
     {
@@ -82,6 +88,8 @@ constexpr bool operator!=(Move m1, Move m2)
 {
     return m1.getMove() != m2.getMove();
 }
+
+
 
 struct MoveList
 {
