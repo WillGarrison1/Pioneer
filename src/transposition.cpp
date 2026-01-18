@@ -13,7 +13,7 @@ TranspositionTable* tTable =
 
 void TranspositionEntry::Set(Key key, Score score, Move move, unsigned char depth, unsigned char age, NodeBound bound)
 {
-    this->key = key >> 48;
+    this->key = key >> 32;
     this->score = score;
     this->move = move.getMove();
     this->depth = depth;
@@ -42,7 +42,7 @@ TranspositionEntry* TranspositionTable::GetEntry(Key key)
 {
     unsigned long long index = key & (this->numBuckets - 1);
     TranspositionBucket* bucket = &this->buckets[index];
-    unsigned short intKey = key >> 48;
+    uint32_t intKey = key >> 32;
 
     TranspositionEntry* result = nullptr;
 

@@ -12,8 +12,8 @@
 #include "time.h"
 #include "transposition.h"
 
-#define INF 1000000
-#define MATE 100000
+#define INF 30000
+#define MATE 10000
 
 #define MAX_DEPTH 256
 #define FUTILITY_DEPTH 4

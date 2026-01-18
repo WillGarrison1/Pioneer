@@ -17,9 +17,9 @@ enum class NodeBound : unsigned char
 
 struct TranspositionEntry
 {
-    unsigned short key; // the upper 16 bits of the zobrist hash
-    Score score;        // The score of this position at depth
-    uint16_t move;      // best move to be played
+    uint32_t key;  // the upper 32 bits of the zobrist hash
+    int16_t score; // The score of this position at depth
+    uint16_t move; // best move to be played
 
     unsigned char depth; // the depth the score was calculated at
     unsigned char flags; // the age at which this position is and the node bound
