@@ -12,7 +12,7 @@
 #define CAPTURE_BONUS 10000
 #define PROMOTION_BONUS 9000
 
-#define MVV_LVA_VICTIM_MULTI 3
+#define MVV_LVA_VICTIM_MULTI 4
 #define MVV_LVA_ATTACKER_MULTI_GOOD 5
 #define MVV_LVA_ATTACKER_MULTI_BAD 1
 
@@ -21,9 +21,11 @@
 
 #define PV_BONUS 30000
 #define KILLER_MOVE_BONUS 8000
-#define COUNTERMOVE_BONUS 4000
+#define COUNTERMOVE_BONUS 7000
 #define MAX_HISTORY 1000
-#define MAX_CAPTURE_HISTORY 10000
+#define MAX_CAPTURE_HISTORY 1000
+
+#define CONTINUATION_HISTORY_SIZE 2
 
 struct MoveVal
 {
@@ -37,16 +39,15 @@ enum SortType
     QUIESCENCE
 };
 
-MoveVal ScoreMove(const Board &board, Move m);
-MoveVal ScoreMoveQ(const Board &board, Move m);
+MoveVal ScoreMove(const Board& board, Move m);
+MoveVal ScoreMoveQ(const Board& board, Move m);
 
-template <SortType S>
 struct MoveSorter
 {
     MoveVal moveVals[256];
     unsigned int size;
 
-    MoveSorter(const Board &board, MoveList *mlist, Move best) : size(mlist->size)
+    MoveSorter(const Board& board, MoveList* mlist, Move best) : size(mlist->size)
     {
         for (unsigned int i = 0; i < size; i++)
         {
@@ -54,7 +55,7 @@ struct MoveSorter
                 moveVals[i] = {best, PV_BONUS};
             else
             {
-                if constexpr (S == QUIESCENCE)
+                if (mlist->moves[i].isType<CAPTURE>())
                     moveVals[i] = ScoreMoveQ(board, mlist->moves[i]);
                 else
                     moveVals[i] = ScoreMove(board, mlist->moves[i]);
@@ -77,19 +78,21 @@ struct MoveSorter
             }
         }
 
-        Move bestMove = moveVals[bestIndex].m;
+        MoveVal bestMove = moveVals[bestIndex];
 
-        // Remove the best move from the list
+        // Swap the best move with the end list
         moveVals[bestIndex] = moveVals[--size];
+        moveVals[size + 1] = bestMove;
 
-        return bestMove;
+        return bestMove.m;
     }
 };
 
-extern Move killerMoves[MAX_PLY][2];  // each ply can have two killer moves
-extern int moveHistory[2][64][64];    // History for [isBlack][from][to]
-extern int captureHistory[2][64][64]; // same as moveHistory
+extern Move killerMoves[MAX_PLY][2];                // each ply can have two killer moves
+extern int moveHistory[2][64][64];                  // History for [isBlack][from][to]
+extern int captureHistory[64][64][PieceType::KING]; // same as moveHistory
 extern Move counterMove[64][64];
+extern int continuationHistory[CONTINUATION_HISTORY_SIZE][6][64][6][64];
 
 inline bool isKillerMove(unsigned char ply, Move m)
 {
@@ -105,9 +108,30 @@ inline void addKillerMove(unsigned char ply, Move m)
     killerMoves[ply][0] = m;
 }
 
+inline void updateContinuationHistory(Board& board, Move m, int depth, bool negate)
+{
+    int negative = negate ? -1 : 1;
+    const BoardState* prevState = board.getState();
+    PieceType moved = getType(board.getSQ(m.from()));
+    int clampedBonus = std::clamp(depth * depth, -MAX_HISTORY, MAX_HISTORY) * negative;
+    for (int i = 0; i < CONTINUATION_HISTORY_SIZE; i++)
+    {
+        if (!prevState || prevState->moved == EMPTY)
+            break;
+
+        PieceType pType = getType(prevState->moved);
+        Move prevMove = prevState->move;
+        continuationHistory[i][pType - 1][prevMove.to()][moved - 1][m.to()] +=
+            clampedBonus -
+            continuationHistory[i][pType - 1][prevMove.to()][moved - 1][m.to()] * std::abs(clampedBonus) / MAX_HISTORY;
+
+        prevState = prevState->prev;
+    }
+}
+
 inline void addHistoryBonus(bool isBlack, Move m, int depth)
 {
-    int clampedBonus = std::clamp(depth * depth, -MAX_HISTORY, MAX_HISTORY);
+    int clampedBonus = std::clamp(depth * depth * 2, -MAX_HISTORY, MAX_HISTORY);
     moveHistory[isBlack][m.from()][m.to()] +=
         clampedBonus - moveHistory[isBlack][m.from()][m.to()] * std::abs(clampedBonus) / MAX_HISTORY;
 }
@@ -115,34 +139,30 @@ inline void addHistoryBonus(bool isBlack, Move m, int depth)
 inline void addHistoryPenalty(bool isBlack, Move m, int depth)
 {
 
-    const int penalty = std::clamp(depth * depth * 10, -MAX_HISTORY, MAX_HISTORY);
+    const int penalty = std::clamp(depth * depth * 2, -MAX_HISTORY, MAX_HISTORY);
     moveHistory[isBlack][m.from()][m.to()] -=
         penalty + moveHistory[isBlack][m.from()][m.to()] * std::abs(penalty) / MAX_HISTORY;
 }
 
-inline void addCaptureBonus(bool isBlack, Move m, int depth)
+inline void addCaptureBonus(PieceType victimType, Move m, int depth)
 {
-    int clampedBonus = std::clamp(depth * depth * 10, -MAX_CAPTURE_HISTORY, MAX_CAPTURE_HISTORY);
-    captureHistory[isBlack][m.from()][m.to()] +=
-        clampedBonus - captureHistory[isBlack][m.from()][m.to()] * std::abs(clampedBonus) / MAX_CAPTURE_HISTORY;
+    int clampedBonus = std::clamp(depth * depth * 20, -MAX_CAPTURE_HISTORY, MAX_CAPTURE_HISTORY);
+    captureHistory[m.from()][m.to()][victimType - 1] +=
+        clampedBonus - captureHistory[m.from()][m.to()][victimType - 1] * std::abs(clampedBonus) / MAX_CAPTURE_HISTORY;
 }
 
-inline void addCapturePenalty(bool isBlack, Move m, int depth)
+inline void addCapturePenalty(PieceType victimType, Move m, int depth)
 {
-
-    const int penalty = std::clamp(depth * depth, -MAX_CAPTURE_HISTORY, MAX_CAPTURE_HISTORY);
-    captureHistory[isBlack][m.from()][m.to()] -=
-        penalty + captureHistory[isBlack][m.from()][m.to()] * std::abs(penalty) / MAX_CAPTURE_HISTORY;
+    const int penalty = std::clamp(depth * depth * 20, -MAX_CAPTURE_HISTORY, MAX_CAPTURE_HISTORY);
+    captureHistory[m.from()][m.to()][victimType - 1] -=
+        penalty + captureHistory[m.from()][m.to()][victimType - 1] * std::abs(penalty) / MAX_CAPTURE_HISTORY;
 }
 
-inline Score Mvv_Lva_Score(const Board &board, Move m)
+inline Score Mvv_Lva_Score(const Board& board, Move m)
 {
-    Bitboard attacked = board.getAttacked(~board.sideToMove);
-    bool isVictimDefended = (sqrToBB(m.to()) & attacked) != 0;
     PieceType victimType = getType(board.getSQ(m.to()));
     PieceType pieceType = getType(board.getSQ(m.from()));
 
-    return (pieceScores[victimType] * MVV_LVA_VICTIM_MULTI - pieceScores[pieceType]) *
-           (isVictimDefended ? MVV_LVA_ATTACKER_MULTI_BAD : MVV_LVA_ATTACKER_MULTI_GOOD);
+    return (pieceScores[victimType] * MVV_LVA_VICTIM_MULTI - pieceScores[pieceType]);
 }
 #endif

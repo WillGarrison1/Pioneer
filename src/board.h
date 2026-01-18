@@ -15,22 +15,23 @@ static const std::string START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBN
 // Contains all the information about the current state of the board
 struct BoardState
 {
-    unsigned char enPassantSquare; // En passant square
-    CastlingRights castling;       // Castling rights
-    Move move;                     // Move that led to this board state
+    BoardState* prev;
 
     Bitboard attacks[2]; // the attacks a side has (white = 0 black = 1)
     Bitboard checkers;
+    Key zobristHash;
     Piece captured;
+    Piece moved;
 
-    unsigned char move50rule;
-    unsigned char repetition;
+    
+    
     Score pawn_material;
     Score non_pawn_material;
-
-    BoardState* prev;
-
-    Key zobristHash;
+    CastlingRights castling; // Castling rights
+    Move move;               // Move that led to this board state
+    unsigned char enPassantSquare; // En passant square
+    unsigned char repetition;
+    unsigned char move50rule;
 
     BoardState();
     BoardState(BoardState* prev);

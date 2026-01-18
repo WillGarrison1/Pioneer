@@ -27,6 +27,7 @@ BoardState::BoardState()
     move50rule = 0;
 
     captured = EMPTY;
+    moved = EMPTY;
     pawn_material = 0;
     non_pawn_material = 0;
 
@@ -167,6 +168,7 @@ void Board::makeMove(Move move, BoardState *newState)
     newState->move = move;
     newState->checkers = 0;
     newState->captured = board[move.to()];
+    newState->moved = board[move.from()];
 
     newState->enPassantSquare = SQ_NONE; //* note: only set if en passant can be played
     newState->move50rule++;
@@ -424,7 +426,9 @@ void Board::makeNullMove(BoardState *newState)
     if (state->enPassantSquare != SQ_NONE) // if enPassant square from last move, remove it from zobrist
         state->zobristHash ^= enPassantHash[getFile(getEnPassantSqr())];
 
+
     state->enPassantSquare = SQ_NONE; // note: only set if en passant can be played
+
 
     whiteToMove = !whiteToMove;
     sideToMove = ~sideToMove;
