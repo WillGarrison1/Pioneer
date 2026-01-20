@@ -136,7 +136,7 @@ void InitMagics()
         bishopSize += numBlockers;
     }
 
-    std::cout << "Bishop magic size: " << (unsigned long long)((float)bishopSize / 1024.0f * 8.0f) << "kb" << std::endl;
+    // std::cout << "Bishop magic size: " << (unsigned long long)((float)bishopSize / 1024.0f * 8.0f) << "kb" << std::endl;
 
     unsigned long long rookSize = 0;
 
@@ -150,7 +150,7 @@ void InitMagics()
         rookSize += numBlockers;
     }
 
-    std::cout << "Rook magic size: " << (unsigned long long)((float)rookSize / 1024.0f * 8.0f) << "kb" << std::endl;
+    // std::cout << "Rook magic size: " << (unsigned long long)((float)rookSize / 1024.0f * 8.0f) << "kb" << std::endl;
 
     slidingMoves = new (std::align_val_t(64)) Bitboard[rookSize + bishopSize];
 

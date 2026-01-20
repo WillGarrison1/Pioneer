@@ -17,7 +17,7 @@ enum class NodeBound : unsigned char
 
 struct TranspositionEntry
 {
-    uint32_t key;  // the upper 32 bits of the zobrist hash
+    uint32_t key; // the upper 32 bits of the zobrist hash
     int16_t score; // The score of this position at depth
     uint16_t move; // best move to be played
 
@@ -64,7 +64,7 @@ class TranspositionTable
 
     TranspositionEntry* GetEntry(Key key);
 
-    void SetEntry(Key zobrist, Score score, unsigned char depth, NodeBound bound, Move bestMove);
+    void SetEntry(Key zobrist, Score score, int depth, NodeBound bound, Move bestMove);
 
     float GetFull(); // gets how full the table is, from 0-1
 

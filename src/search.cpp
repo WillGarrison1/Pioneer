@@ -12,8 +12,8 @@
 #include "time.h"
 #include "transposition.h"
 
-#define INF 30000
-#define MATE 10000
+#define INF 32000
+#define MATE 31000
 
 #define MAX_DEPTH 256
 #define FUTILITY_DEPTH 4
@@ -21,11 +21,11 @@
 constexpr int lmr_index = 2; // the first index lmr will be used on
 constexpr int lmr_depth = 2; // the minimum depth lmr can be used
 
-constexpr Score aspirationStartingDelta = 50;
-constexpr float aspirationMultiplier = 2.0f;
+constexpr Score aspirationStartingDelta = 30;
+constexpr float aspirationMultiplier = 1.5f;
 
 #define NULL_DEPTH 3
-#define IIR_DEPTH 6 // internal iterative reduction depth
+#define IIR_DEPTH 4 // internal iterative reduction depth
 #define FUTILITY_MARGIN(DEPTH) 80 + 120 * DEPTH
 #define DELTA 200
 
@@ -210,7 +210,7 @@ Score qsearch(Board& board, int ply, Score alpha, Score beta)
                 if (score >= beta)
                 {
                     tTable->SetEntry(board.getHash(), mateToTT(score, ply), 0, NodeBound::Lower, m);
-
+                    numBetaCutoffs++;
                     return score;
                 }
                 alpha = score;
@@ -288,7 +288,7 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
     {
         // Internal Iterative Deepening
         PVLine tmpPv;
-        search<CUTNode>(board, depth >> 1, ply, alpha, beta, &tmpPv);
+        search<CUTNode>(board, (depth >> 1), ply, alpha, beta, &tmpPv);
 
         if (tmpPv.len > 0)
             bestEntryMove = tmpPv.moves[0];
@@ -418,6 +418,9 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
 
         if (score >= beta)
         {
+            if (isDone) // don't save on incomplete search
+                return score;
+
             if (isPVNode)
             {
                 prevLine->moves[0] = move;
@@ -428,8 +431,12 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
                 }
             }
 
+            updateContinuationHistory(board, move, depth, false);
+
             if (move.isType<QUIET>())
             {
+                counterMove[board.getState()->move.from()][board.getState()->move.to()] = move;
+
                 addKillerMove(board.getPly(), move);
                 addHistoryBonus(!board.whiteToMove, move, depth); // add move history bonus
 
@@ -437,12 +444,14 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
                 {
                     Move penaltyMove = sorter.moveVals[p].m;
 
-                    if (penaltyMove.isType<QUIET>() && penaltyMove != move)
+                    if (penaltyMove == move)
+                        continue;
+                    if (penaltyMove.isType<QUIET>())
                         addHistoryPenalty(!board.whiteToMove, penaltyMove, depth);
                     updateContinuationHistory(board, penaltyMove, depth, true);
                 }
             }
-            if (board.getSQ(move.to()) != EMPTY)
+            else if (move.isType<CAPTURE>())
             {
                 PieceType victimType = getType(board.getSQ(move.to()));
                 if (move.to() == board.getEnPassantSqr())
@@ -452,8 +461,9 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
                 for (int p = moves.size - i; p < moves.size; p++)
                 {
                     Move penaltyMove = sorter.moveVals[p].m;
-
-                    if (penaltyMove.isType<CAPTURE>() && penaltyMove != move)
+                    if (penaltyMove == move)
+                        continue;
+                    if (penaltyMove.isType<CAPTURE>())
                     {
                         victimType = getType(board.getSQ(penaltyMove.to()));
                         if (penaltyMove.to() == board.getEnPassantSqr())
@@ -463,11 +473,8 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
                     updateContinuationHistory(board, penaltyMove, depth, true);
                 }
             }
-            updateContinuationHistory(board, move, depth, false);
 
-            counterMove[board.getState()->move.from()][board.getState()->move.to()] = move;
-            if (!isDone) // don't save on incomplete search
-                tTable->SetEntry(board.getHash(), mateToTT(score, ply), depth, NodeBound::Lower, move);
+            tTable->SetEntry(board.getHash(), mateToTT(score, ply), depth, NodeBound::Lower, move);
             numBetaCutoffs++;
             return score;
         }
@@ -478,15 +485,6 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
                 nodeBound = NodeBound::Exact;
                 alpha = score;
 
-                if (move.isType<QUIET>())
-                    addHistoryBonus(!board.whiteToMove, move, depth); // add move history bonus
-                else if (board.getSQ(move.to()) != EMPTY || move.to() == board.getEnPassantSqr())
-                {
-                    PieceType victimType = getType(board.getSQ(move.to()));
-                    if (move.to() == board.getEnPassantSqr())
-                        victimType = PAWN;
-                    addCaptureBonus(victimType, move, depth); // add move history bonus
-                }
                 if (isPVNode)
                 {
                     UpdatePV(&line, move, prevLine);

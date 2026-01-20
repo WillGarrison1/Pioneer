@@ -9,23 +9,23 @@
 
 #include <algorithm>
 
-#define CAPTURE_BONUS 10000
-#define PROMOTION_BONUS 9000
+#define CAPTURE_BONUS 400000
+#define PROMOTION_BONUS 500000
 
 #define MVV_LVA_VICTIM_MULTI 4
 #define MVV_LVA_ATTACKER_MULTI_GOOD 5
 #define MVV_LVA_ATTACKER_MULTI_BAD 1
 
-#define DEFENDED_BONUS 25
-#define ATTACKED_PENALTY -35
+#define DEFENDED_BONUS 100
+#define ATTACKED_PENALTY -100
 
-#define PV_BONUS 30000
-#define KILLER_MOVE_BONUS 8000
-#define COUNTERMOVE_BONUS 7000
-#define MAX_HISTORY 1000
-#define MAX_CAPTURE_HISTORY 1000
+#define PV_BONUS 1000000
+#define KILLER_MOVE_BONUS 300000
+#define COUNTERMOVE_BONUS 200000
+#define MAX_HISTORY 20000
+#define MAX_CAPTURE_HISTORY 30000
 
-#define CONTINUATION_HISTORY_SIZE 2
+#define CONTINUATION_HISTORY_SIZE 3
 
 struct MoveVal
 {
@@ -82,7 +82,7 @@ struct MoveSorter
 
         // Swap the best move with the end list
         moveVals[bestIndex] = moveVals[--size];
-        moveVals[size + 1] = bestMove;
+        moveVals[size] = bestMove;
 
         return bestMove.m;
     }
@@ -94,14 +94,9 @@ extern int captureHistory[64][64][PieceType::KING]; // same as moveHistory
 extern Move counterMove[64][64];
 extern int continuationHistory[CONTINUATION_HISTORY_SIZE][6][64][6][64];
 
-inline bool isKillerMove(unsigned char ply, Move m)
-{
-    return killerMoves[ply][0] == m || killerMoves[ply][1] == m;
-}
-
 inline void addKillerMove(unsigned char ply, Move m)
 {
-    if (isKillerMove(ply, m))
+    if (killerMoves[ply][0] == m)
         return;
 
     killerMoves[ply][1] = killerMoves[ply][0];
@@ -131,7 +126,7 @@ inline void updateContinuationHistory(Board& board, Move m, int depth, bool nega
 
 inline void addHistoryBonus(bool isBlack, Move m, int depth)
 {
-    int clampedBonus = std::clamp(depth * depth * 2, -MAX_HISTORY, MAX_HISTORY);
+    int clampedBonus = std::clamp(depth * depth * depth, -MAX_HISTORY, MAX_HISTORY);
     moveHistory[isBlack][m.from()][m.to()] +=
         clampedBonus - moveHistory[isBlack][m.from()][m.to()] * std::abs(clampedBonus) / MAX_HISTORY;
 }
@@ -139,21 +134,21 @@ inline void addHistoryBonus(bool isBlack, Move m, int depth)
 inline void addHistoryPenalty(bool isBlack, Move m, int depth)
 {
 
-    const int penalty = std::clamp(depth * depth * 2, -MAX_HISTORY, MAX_HISTORY);
-    moveHistory[isBlack][m.from()][m.to()] -=
-        penalty + moveHistory[isBlack][m.from()][m.to()] * std::abs(penalty) / MAX_HISTORY;
+    const int penalty = std::clamp(depth * depth * depth, -MAX_HISTORY, MAX_HISTORY);
+    auto gravity = moveHistory[isBlack][m.from()][m.to()] * std::abs(penalty) / MAX_HISTORY;
+    moveHistory[isBlack][m.from()][m.to()] -= penalty + gravity;
 }
 
 inline void addCaptureBonus(PieceType victimType, Move m, int depth)
 {
-    int clampedBonus = std::clamp(depth * depth * 20, -MAX_CAPTURE_HISTORY, MAX_CAPTURE_HISTORY);
+    int clampedBonus = std::clamp(depth * depth * depth, -MAX_CAPTURE_HISTORY, MAX_CAPTURE_HISTORY);
     captureHistory[m.from()][m.to()][victimType - 1] +=
         clampedBonus - captureHistory[m.from()][m.to()][victimType - 1] * std::abs(clampedBonus) / MAX_CAPTURE_HISTORY;
 }
 
 inline void addCapturePenalty(PieceType victimType, Move m, int depth)
 {
-    const int penalty = std::clamp(depth * depth * 20, -MAX_CAPTURE_HISTORY, MAX_CAPTURE_HISTORY);
+    const int penalty = std::clamp(depth * depth * depth, -MAX_CAPTURE_HISTORY, MAX_CAPTURE_HISTORY);
     captureHistory[m.from()][m.to()][victimType - 1] -=
         penalty + captureHistory[m.from()][m.to()][victimType - 1] * std::abs(penalty) / MAX_CAPTURE_HISTORY;
 }
@@ -163,6 +158,6 @@ inline Score Mvv_Lva_Score(const Board& board, Move m)
     PieceType victimType = getType(board.getSQ(m.to()));
     PieceType pieceType = getType(board.getSQ(m.from()));
 
-    return (pieceScores[victimType] * MVV_LVA_VICTIM_MULTI - pieceScores[pieceType]);
+    return (pieceScores[victimType] - pieceScores[pieceType]);
 }
 #endif
