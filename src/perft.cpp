@@ -1,11 +1,11 @@
 #include "perft.h"
 #include "movegen.h"
 
-unsigned long long perft(Board &board, unsigned int depth)
+unsigned long long perft(Board& board, unsigned int depth)
 {
 
     MoveList moves;
-    generateMoves<ALL_MOVES>(board, &moves);
+    board.generateMoves<ALL_MOVES>(&moves);
 
     if (depth == 1)
     {

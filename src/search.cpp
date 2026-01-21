@@ -159,10 +159,10 @@ Score qsearch(Board& board, int ply, Score alpha, Score beta)
     MoveList moves;
     if (!board.getNumChecks()) // If not in check, generate captures
     {
-        generateMoves<CAPTURE>(board, &moves);
+        board.generateMoves<CAPTURE>(&moves);
         if (!moves.size) // if no moves, check for stalemate
         {
-            generateMoves<ALL_MOVES>(board, &moves);
+            board.generateMoves<ALL_MOVES>(&moves);
             if (moves.size == 0)
                 return 0; // stalemate
             return pat;
@@ -170,7 +170,7 @@ Score qsearch(Board& board, int ply, Score alpha, Score beta)
     }
     else // if in check, generate evasions
     {
-        generateMoves<ALL_MOVES>(board, &moves);
+        board.generateMoves<ALL_MOVES>(&moves);
         if (!moves.size) // if no moves, checkmate
         {
             return -MATE + ply;
@@ -292,7 +292,7 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
     }
 
     MoveList moves;
-    generateMoves<ALL_MOVES>(board, &moves); // compute moves here because generateMoves computes checks
+    board.generateMoves<ALL_MOVES>(&moves); // compute moves here because generateMoves computes checks
 
     if (moves.size == 0)
     {
@@ -302,7 +302,6 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
             return 0;
     }
 
-    BoardState state;
     // reverse futility pruning
     if (!isPVNode && !board.getNumChecks() && depth <= 8)
     {
@@ -326,6 +325,8 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
             return qsearch(board, ply, alpha, beta);
         }
     }
+
+    BoardState state;
 
     // null move pruning
 
@@ -599,7 +600,7 @@ Move startSearch(Board& board, unsigned int depth, unsigned int nodes, unsigned 
         float maxTime = (float)remaining_time / 25.0f;
 
         MoveList mlist;
-        generateMoves<ALL_MOVES>(board, &mlist);
+        board.generateMoves<ALL_MOVES>(&mlist);
         if (mlist.size > 30)
             maxTime *= 1.5;
         else if (mlist.size < 10)

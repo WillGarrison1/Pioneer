@@ -89,8 +89,6 @@ constexpr bool operator!=(Move m1, Move m2)
     return m1.getMove() != m2.getMove();
 }
 
-
-
 struct MoveList
 {
     Move moves[256];
@@ -100,6 +98,13 @@ struct MoveList
     {
         assert(size < 256);
         moves[size++] = move;
+    }
+
+    template <MoveType mType>
+    void addMove(const Square& from, const Square& to)
+    {
+        assert(size < 256);
+        moves[size++] = {from, to, mType};
     }
 
     void clear()

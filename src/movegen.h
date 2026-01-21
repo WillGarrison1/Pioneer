@@ -6,10 +6,7 @@
 #include "types.h"
 #include "magic.h"
 
-template <MoveType type>
+template <MoveType type, Color color>
 extern void generateMoves(Board &board, MoveList *list);
-
-template <PieceType pieceType>
-extern void generatePieceMoves(const Board &board, MoveList *list);
 
 #endif // MOVEGEN_H

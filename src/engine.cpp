@@ -37,7 +37,7 @@ Engine::~Engine()
 void Engine::makemove(Move move)
 {
     MoveList legal;
-    generateMoves<ALL_MOVES>(*board, &legal);
+    board->generateMoves<ALL_MOVES>(&legal);
 
     for (int i = 0; i < legal.size; i++)
     {
@@ -63,7 +63,7 @@ void Engine::goPerft(unsigned int depth)
     unsigned long long moveCount = 0;
 
     MoveList moves;
-    generateMoves<ALL_MOVES>(*board, &moves);
+    board->generateMoves<ALL_MOVES>(&moves);
     BoardState state;
 
     for (int i = 0; i < moves.size; i++)
@@ -93,7 +93,7 @@ void Engine::eval()
 void Engine::isCheck(Move move)
 {
     MoveList legal;
-    generateMoves<ALL_MOVES>(*board, &legal);
+    board->generateMoves<ALL_MOVES>(&legal);
 
     for (int i = 0; i < legal.size; i++)
     {

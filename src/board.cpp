@@ -36,7 +36,7 @@ BoardState::BoardState()
     prev = nullptr;
 }
 
-BoardState::BoardState(BoardState *prev)
+BoardState::BoardState(BoardState* prev)
 {
     this->attacks[0] = 0ULL;
     this->attacks[1] = 0ULL;
@@ -110,12 +110,12 @@ void Board::movePiece(Square from, Square to)
     board[to] = piece;
 }
 
-void Board::addPieceZobrist(Piece piece, Square square, Key *key)
+void Board::addPieceZobrist(Piece piece, Square square, Key& key)
 {
     const PieceType pieceType = getType(piece);
     const Color color = getColor(piece);
 
-    *key ^= boardHashes[square][piece];
+    key ^= boardHashes[square][piece];
 
     setBit(pieceBB[pieceType], square);
     setBit(colorBB[color], square);
@@ -123,13 +123,13 @@ void Board::addPieceZobrist(Piece piece, Square square, Key *key)
     board[square] = piece;
 }
 
-void Board::removePieceZobrist(Square square, Key *key)
+void Board::removePieceZobrist(Square square, Key& key)
 {
     const Piece piece = board[square];
     const PieceType pieceType = getType(piece);
     const Color color = getColor(piece);
 
-    *key ^= boardHashes[square][piece];
+    key ^= boardHashes[square][piece];
 
     clearBit(pieceBB[pieceType], square);
     clearBit(colorBB[color], square);
@@ -137,7 +137,7 @@ void Board::removePieceZobrist(Square square, Key *key)
     board[square] = EMPTY;
 }
 
-void Board::movePieceZobrist(Square from, Square to, Key *key)
+void Board::movePieceZobrist(Square from, Square to, Key& key)
 {
     const Piece piece = board[from];
     const PieceType pieceType = getType(piece);
@@ -149,29 +149,32 @@ void Board::movePieceZobrist(Square from, Square to, Key *key)
     setBit(pieceBB[pieceType], to);
     setBit(colorBB[color], to);
 
-    *key ^= boardHashes[to][piece] ^ boardHashes[from][piece];
+    key ^= boardHashes[to][piece] ^ boardHashes[from][piece];
 
     board[from] = EMPTY;
     board[to] = piece;
 }
 
-void Board::makeMove(Move move, BoardState *newState)
+void Board::makeMove(Move move, BoardState* newState)
 {
     PROFILE_FUNC();
 
     // Initialize new board state
-    *newState = *state;
+    newState->zobristHash = state->zobristHash;
+    newState->pawn_material = state->pawn_material;
+    newState->non_pawn_material = state->non_pawn_material;
+    newState->move50rule = state->move50rule + 1;
+    newState->castling = state->castling;
 
     newState->attacks[0] = 0ULL;
     newState->attacks[1] = 0ULL;
+    newState->checkers = 0;
+    newState->repetition = 0;
+    newState->enPassantSquare = SQ_NONE; //* note: only set if en passant can be played
 
     newState->move = move;
-    newState->checkers = 0;
     newState->captured = board[move.to()];
     newState->moved = board[move.from()];
-
-    newState->enPassantSquare = SQ_NONE; //* note: only set if en passant can be played
-    newState->move50rule++;
 
     if (state->enPassantSquare != SQ_NONE) // if enPassant square from last move, remove it from zobrist
         newState->zobristHash ^= enPassantHash[getFile(getEnPassantSqr())];
@@ -182,20 +185,20 @@ void Board::makeMove(Move move, BoardState *newState)
     if (move.type() == CASTLE)
     {
 
-        Square to = move.to();
-        bool kingSide = getFile(to) == FILE_G;
+        const Square to = move.to();
+        const bool kingSide = getFile(to) == FILE_G;
 
         if (whiteToMove)
         {
             if (kingSide)
             {
-                movePieceZobrist(SQ_E1, SQ_G1, &newState->zobristHash);
-                movePieceZobrist(SQ_H1, SQ_F1, &newState->zobristHash);
+                movePieceZobrist(SQ_E1, SQ_G1, newState->zobristHash);
+                movePieceZobrist(SQ_H1, SQ_F1, newState->zobristHash);
             }
             else
             {
-                movePieceZobrist(SQ_E1, SQ_C1, &newState->zobristHash);
-                movePieceZobrist(SQ_A1, SQ_D1, &newState->zobristHash);
+                movePieceZobrist(SQ_E1, SQ_C1, newState->zobristHash);
+                movePieceZobrist(SQ_A1, SQ_D1, newState->zobristHash);
             }
 
             newState->castling &= ~(CASTLE_WK | CASTLE_WQ);
@@ -204,13 +207,13 @@ void Board::makeMove(Move move, BoardState *newState)
         {
             if (kingSide)
             {
-                movePieceZobrist(SQ_E8, SQ_G8, &newState->zobristHash);
-                movePieceZobrist(SQ_H8, SQ_F8, &newState->zobristHash);
+                movePieceZobrist(SQ_E8, SQ_G8, newState->zobristHash);
+                movePieceZobrist(SQ_H8, SQ_F8, newState->zobristHash);
             }
             else
             {
-                movePieceZobrist(SQ_E8, SQ_C8, &newState->zobristHash);
-                movePieceZobrist(SQ_A8, SQ_D8, &newState->zobristHash);
+                movePieceZobrist(SQ_E8, SQ_C8, newState->zobristHash);
+                movePieceZobrist(SQ_A8, SQ_D8, newState->zobristHash);
             }
 
             newState->castling &= ~(CASTLE_BK | CASTLE_BQ);
@@ -218,14 +221,14 @@ void Board::makeMove(Move move, BoardState *newState)
     }
     else
     {
-        Square from = move.from();
-        Square to = move.to();
+        const Square from = move.from();
+        const Square to = move.to();
 
-        Piece piece = board[from];
-        PieceType pieceType = getType(piece);
-        Color color = getColor(piece);
+        const Piece piece = board[from];
+        const PieceType pieceType = getType(piece);
+        const Color color = getColor(piece);
 
-        Piece captured = board[to];
+        const Piece captured = board[to];
 
         // Update castling rights
         if (pieceType == KING && newState->castling)
@@ -250,31 +253,33 @@ void Board::makeMove(Move move, BoardState *newState)
 
         // Update bitboards
 
-        if (move.to() == getEnPassantSqr() && getType(piece) == PAWN)
+        if (move.to() == getEnPassantSqr() && pieceType == PAWN)
         {
             newState->move50rule = 0; // reset 50 move repetition counter on en passant
             Square attacked = to - (whiteToMove ? NORTH : SOUTH);
-            removePieceZobrist(attacked, &newState->zobristHash);
+            removePieceZobrist(attacked, newState->zobristHash);
 
             newState->pawn_material -= pieceScores[PAWN] * (whiteToMove ? -1 : 1);
         }
         else if (captured != EMPTY)
         {
             newState->move50rule = 0; // reset 50 move repetition counter on capture
-            removePieceZobrist(to, &newState->zobristHash);
+            removePieceZobrist(to, newState->zobristHash);
 
-            switch (getType(captured))
+            PieceType captureType = getType(captured);
+
+            switch (captureType)
             {
             case PAWN:
                 newState->pawn_material -= pieceScores[PAWN] * (whiteToMove ? -1 : 1);
                 break;
             default:
-                newState->non_pawn_material -= pieceScores[getType(captured)] * (whiteToMove ? -1 : 1);
+                newState->non_pawn_material -= pieceScores[captureType] * (whiteToMove ? -1 : 1);
                 break;
             }
         }
 
-        movePieceZobrist(from, to, &newState->zobristHash);
+        movePieceZobrist(from, to, newState->zobristHash);
 
         if (pieceType == PAWN)
         {
@@ -282,8 +287,8 @@ void Board::makeMove(Move move, BoardState *newState)
             if (move.type() == PROMOTION)
             {
                 PieceType promote = move.promotion();
-                removePieceZobrist(to, &newState->zobristHash);
-                addPieceZobrist(makePiece(promote, color), to, &newState->zobristHash);
+                removePieceZobrist(to, newState->zobristHash);
+                addPieceZobrist(makePiece(promote, color), to, newState->zobristHash);
 
                 newState->pawn_material -= pieceScores[PAWN] * (whiteToMove ? 1 : -1);
                 newState->non_pawn_material += pieceScores[promote] * (whiteToMove ? 1 : -1);
@@ -337,7 +342,7 @@ void Board::undoMove()
     PROFILE_FUNC();
 
     // Get information from state and delete it
-    Move move = state->move;
+    const Move move = state->move;
 
     whiteToMove = !whiteToMove;
     sideToMove = ~sideToMove;
@@ -377,32 +382,28 @@ void Board::undoMove()
     else
     {
 
-        Square from = move.from();
-        Square to = move.to();
-
-        Piece piece = board[to];
-        Color color = getColor(piece);
-
-        Piece captured = state->captured;
-
-        // Set Piece BBs
-        movePiece(to, from);
-
-        if (state->prev && move.to() == state->prev->enPassantSquare)
-        {
-            Square attacked =
-                to - (whiteToMove ? NORTH : SOUTH); // Switched directions because whiteToMove hasn't been reversed yet
-            addPiece(makePiece(PAWN, ~sideToMove), attacked);
-        }
-        else if (captured != EMPTY)
-        {
-            addPiece(captured, to);
-        }
+        const Square from = move.from();
+        const Square to = move.to();
 
         if (move.type() == PROMOTION)
         {
-            removePiece(from);
-            addPiece(makePiece(PAWN, color), from);
+            addPiece(makePiece(PAWN, getColor(board[to])), from);
+            removePiece(to);
+        }
+        else
+        {
+            movePiece(to, from);
+        }
+
+        if (state->prev && move.to() == state->prev->enPassantSquare)
+        {
+            const Square attacked =
+                to - (whiteToMove ? NORTH : SOUTH); // Switched directions because whiteToMove hasn't been reversed yet
+            addPiece(makePiece(PAWN, ~sideToMove), attacked);
+        }
+        else if (state->captured != EMPTY)
+        {
+            addPiece(state->captured, to);
         }
     }
 
@@ -414,7 +415,7 @@ void Board::undoMove()
     ply--;
 }
 
-void Board::makeNullMove(BoardState *newState)
+void Board::makeNullMove(BoardState* newState)
 {
     *newState = *state;
     newState->prev = state;
@@ -426,9 +427,7 @@ void Board::makeNullMove(BoardState *newState)
     if (state->enPassantSquare != SQ_NONE) // if enPassant square from last move, remove it from zobrist
         state->zobristHash ^= enPassantHash[getFile(getEnPassantSqr())];
 
-
     state->enPassantSquare = SQ_NONE; // note: only set if en passant can be played
-
 
     whiteToMove = !whiteToMove;
     sideToMove = ~sideToMove;
@@ -445,55 +444,11 @@ void Board::undoNullMove()
     state = state->prev;
 }
 
-bool Board::isValidMove(Move move)
-{
-    PROFILE_FUNC();
-
-    Piece piece = board[move.from()];
-    if (piece == EMPTY || getColor(piece) != sideToMove)
-        return false;
-
-    PieceType pieceType = getType(piece);
-    MoveList tempMoveList;
-
-    switch (pieceType)
-    {
-    case PAWN:
-        generatePieceMoves<PAWN>(*this, &tempMoveList);
-        break;
-    case KNIGHT:
-        generatePieceMoves<KNIGHT>(*this, &tempMoveList);
-        break;
-    case BISHOP:
-        generatePieceMoves<BISHOP>(*this, &tempMoveList);
-        break;
-    case ROOK:
-        generatePieceMoves<ROOK>(*this, &tempMoveList);
-        break;
-    case QUEEN:
-        generatePieceMoves<QUEEN>(*this, &tempMoveList);
-        break;
-    case KING:
-        generatePieceMoves<KING>(*this, &tempMoveList);
-        break;
-    default:
-        return false;
-    }
-
-    for (int i = 0; i < tempMoveList.size; i++)
-    {
-        if (tempMoveList[i].getMove() == move.getMove())
-            return true;
-    }
-
-    return false;
-}
-
-unsigned int Board::getRepetition()
+unsigned int Board::getRepetition() const
 {
     Key zobrist = state->zobristHash;
 
-    BoardState *currState = state->prev;
+    BoardState* currState = state->prev;
     while (currState != nullptr)
     {
         if (currState->zobristHash == zobrist)
@@ -551,7 +506,7 @@ void Board::clear()
     }
 }
 
-void Board::setFen(const std::string &fen, BoardState *newState)
+void Board::setFen(const std::string& fen, BoardState* newState)
 {
     clear();
 
@@ -734,15 +689,15 @@ void Board::computeAttackedBBs()
 #endif
 }
 
-void Board::computePins(Bitboard &pinnedS, Bitboard &pinnedD)
+void Board::computePins(Bitboard& pinnedS, Bitboard& pinnedD)
 {
     pinnedS = pinnedD = 0ULL;
 
-    Square king = lsb(getBB(sideToMove, KING));
-    Bitboard friendlyPieces = getBB(sideToMove);
-    Bitboard enemyPieces = getBB(~sideToMove);
-    Bitboard diagonal = GetBishopMoves(enemyPieces, king);
-    Bitboard straight = GetRookMoves(enemyPieces, king);
+    const Square king = lsb(getBB(sideToMove, KING));
+    const Bitboard friendlyPieces = getBB(sideToMove);
+    const Bitboard enemyPieces = getBB(~sideToMove);
+    const Bitboard diagonal = GetBishopMoves(enemyPieces, king);
+    const Bitboard straight = GetRookMoves(enemyPieces, king);
 
     Bitboard diagonalAttackers = getBB(~sideToMove, BISHOP, QUEEN) & diagonal;
     Bitboard straightAttackers = getBB(~sideToMove, ROOK, QUEEN) & straight;

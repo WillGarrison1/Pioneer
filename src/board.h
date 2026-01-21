@@ -8,6 +8,8 @@
 #include "piece.h"
 #include "types.h"
 
+#include "movegen.h"
+
 #define MAX_PLY 1024
 
 static const std::string START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
@@ -23,12 +25,10 @@ struct BoardState
     Piece captured;
     Piece moved;
 
-    
-    
     Score pawn_material;
     Score non_pawn_material;
-    CastlingRights castling; // Castling rights
-    Move move;               // Move that led to this board state
+    CastlingRights castling;       // Castling rights
+    Move move;                     // Move that led to this board state
     unsigned char enPassantSquare; // En passant square
     unsigned char repetition;
     unsigned char move50rule;
@@ -45,21 +45,28 @@ class Board
     Board();
     ~Board();
 
-    void addPiece(Piece piece, Square square);
-    void removePiece(Square square);
-    void movePiece(Square from, Square to);
+    void addPiece(const Piece piece, const Square square);
+    void removePiece(const Square square);
+    void movePiece(const Square from, const Square to);
 
-    void addPieceZobrist(Piece piece, Square to, Key* key);
-    void removePieceZobrist(Square from, Key* key);
-    void movePieceZobrist(Square from, Square to, Key* key); // moves the piece and updates the zobrist hash
+    void addPieceZobrist(const Piece piece, const Square to, Key& key);
+    void removePieceZobrist(const Square from, Key& key);
+    void movePieceZobrist(const Square from, const Square to, Key& key); // moves the piece and updates the zobrist hash
 
-    void makeMove(Move move, BoardState* newState);
+    void makeMove(const Move move, BoardState* newState);
     void undoMove();
 
     void makeNullMove(BoardState* state);
     void undoNullMove();
 
-    bool isValidMove(Move move);
+    template <MoveType type>
+    inline void generateMoves(MoveList* list)
+    {
+        if (whiteToMove)
+            ::generateMoves<type, WHITE>(*this, list);
+        else
+            ::generateMoves<type, BLACK>(*this, list);
+    }
 
     /**
      * @brief checks if a move causes check
@@ -87,39 +94,39 @@ class Board
     // Get bitboards
 
     // Get bitboard for piecetypes
-    inline Bitboard getBB(PieceType piece) const
+    inline Bitboard getBB(const PieceType piece) const
     {
         return pieceBB[piece];
     }
 
     // Get bitboard for multiple piecetypes (ripped from stockfish)
     template <typename... PieceTypes>
-    inline Bitboard getBB(PieceType piece, PieceTypes... pieces) const
+    inline Bitboard getBB(const PieceType piece, const PieceTypes... pieces) const
     {
         return getBB(piece) | getBB(pieces...);
     }
 
     // Get bitboard for color
-    inline Bitboard getBB(Color color) const
+    inline Bitboard getBB(const Color color) const
     {
         return colorBB[color];
     }
 
     // Get bitboard for multiple colors
     template <typename... Colors>
-    inline Bitboard getBB(Color color, Colors... colors) const
+    inline Bitboard getBB(const Color color, const Colors... colors) const
     {
         return (getBB(color) | getBB(colors...));
     }
 
     template <typename... PieceTypes>
-    inline Bitboard getBB(Color color, PieceType piece, PieceTypes... pieces) const
+    inline Bitboard getBB(const Color color, const PieceType piece, const PieceTypes... pieces) const
     {
         return getBB(color) & getBB(piece, pieces...);
     }
 
     // Get piece on square
-    inline Piece getSQ(Square square) const
+    inline Piece getSQ(const Square square) const
     {
         return board[square];
     }
@@ -130,7 +137,7 @@ class Board
      * @param c color
      * @return Bitboard
      */
-    inline Bitboard getAttacked(Color c) const
+    inline Bitboard getAttacked(const Color c) const
     {
         return state->attacks[c == BLACK];
     }
@@ -170,7 +177,7 @@ class Board
         return state->non_pawn_material;
     }
 
-    unsigned int getRepetition(); // gets the amount of times this position appeared on the board
+    unsigned int getRepetition() const; // gets the amount of times this position appeared on the board
 
     inline Key getHash() const
     {

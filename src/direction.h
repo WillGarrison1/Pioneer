@@ -2,6 +2,7 @@
 #define DIRECTION_H
 
 #include "types.h"
+#include <cmath>
 
 // Precompute stuff
 
@@ -41,7 +42,7 @@ constexpr Direction operator*(Direction a, File b)
 
 constexpr Direction operator<<(const Direction a, int b)
 {
-    return static_cast<Direction>(static_cast<int>(a) << b);
+    return static_cast<Direction>((static_cast<uint32_t>(std::abs(a)) << b) * a / std::abs(a));
 }
 
 constexpr Direction operator>>(const Direction a, int b)
