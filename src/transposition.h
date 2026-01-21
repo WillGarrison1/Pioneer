@@ -17,7 +17,7 @@ enum class NodeBound : unsigned char
 
 struct TranspositionEntry
 {
-    uint32_t key; // the upper 32 bits of the zobrist hash
+    uint32_t key;  // the upper 32 bits of the zobrist hash
     int16_t score; // The score of this position at depth
     uint16_t move; // best move to be played
 
@@ -34,6 +34,11 @@ struct TranspositionEntry
     inline unsigned char getAge() const
     {
         return flags & 0x3f;
+    }
+
+    inline void setAge(unsigned char age)
+    {
+        flags = (flags & 0xc0) | (age & 0x3f);
     }
 } __attribute__((packed));
 
@@ -69,6 +74,11 @@ class TranspositionTable
     float GetFull(); // gets how full the table is, from 0-1
 
     void Clear();
+
+    inline unsigned char GetAge()
+    {
+        return age;
+    }; // gets how full the table is, from 0-1
 
   private:
     TranspositionBucket* buckets;

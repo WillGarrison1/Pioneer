@@ -9,7 +9,7 @@ Key castleRightsHash[16];
 Key enPassantHash[8];
 
 TranspositionTable* tTable =
-    new (std::align_val_t(64)) TranspositionTable(1024 * 1024 * 256); // transposition table with a size of 64 MB
+    new (std::align_val_t(64)) TranspositionTable(1024 * 1024 * 64); // transposition table with a size of 64 MB
 
 void TranspositionEntry::Set(Key key, Score score, Move move, unsigned char depth, unsigned char age, NodeBound bound)
 {
@@ -54,6 +54,7 @@ TranspositionEntry* TranspositionTable::GetEntry(Key key)
 
 void TranspositionTable::SetEntry(Key zobrist, Score score, int depth, NodeBound bound, Move bestMove)
 {
+    assert(bestMove.getMove() != 0);
     unsigned long long index = zobrist & (this->numBuckets - 1); // much faster than modulo
     TranspositionBucket* bucket = &this->buckets[index];
 
@@ -68,9 +69,12 @@ void TranspositionTable::SetEntry(Key zobrist, Score score, int depth, NodeBound
             break;
         }
 
-        if (e.key == zobrist >> 32ULL)
+        if (e.key == zobrist >> 32ULL) // if we find the position in the table
         {
+            e.setAge(age);
             if (depth < e.depth)
+                return;
+            if (e.getNodeBound() == NodeBound::Exact && bound != NodeBound::Exact)
                 return;
             entry = &e;
             break;

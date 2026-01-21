@@ -25,7 +25,7 @@ constexpr Score aspirationStartingDelta = 30;
 constexpr float aspirationMultiplier = 1.5f;
 
 #define NULL_DEPTH 3
-#define IIR_DEPTH 4 // internal iterative reduction depth
+#define IIR_DEPTH 6 // internal iterative reduction depth
 #define FUTILITY_MARGIN(DEPTH) 80 + 120 * DEPTH
 #define DELTA 200
 
@@ -139,7 +139,7 @@ Score qsearch(Board& board, int ply, Score alpha, Score beta)
             (entry->getNodeBound() == NodeBound::Upper && corrected <= alpha) ||
             (entry->getNodeBound() == NodeBound::Lower && corrected >= beta))
         {
-            tTable->SetEntry(board.getHash(), entry->score, entry->depth, entry->getNodeBound(), entry->move);
+            entry->setAge(tTable->GetAge()); // reset the age for this node
             return corrected;
         }
 
@@ -229,7 +229,7 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
     if (isDone)
         return 0;
 
-    if (getTime() - startTime > maxTime)
+    if ((numNodes & 2047) == 0 && getTime() - startTime > maxTime)
     {
         isDone = true;
         return 0;
@@ -267,7 +267,7 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
                               (entry->getNodeBound() == NodeBound::Upper && corrected <= alpha) ||
                               (entry->getNodeBound() == NodeBound::Lower && corrected >= beta)))
             {
-                tTable->SetEntry(board.getHash(), entry->score, entry->depth, entry->getNodeBound(), entry->move);
+                entry->setAge(tTable->GetAge()); // reset the age for this node
                 return corrected;
             }
             else if (isPVNode)
@@ -283,15 +283,6 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
     {
         // Internal Iterative Reduction if no hashmove found (reduce depth by one)
         depth--;
-    }
-    else if (isPVNode && depth > 8)
-    {
-        // Internal Iterative Deepening
-        PVLine tmpPv;
-        search<CUTNode>(board, (depth >> 1), ply, alpha, beta, &tmpPv);
-
-        if (tmpPv.len > 0)
-            bestEntryMove = tmpPv.moves[0];
     }
 
     if (depth == 0)
