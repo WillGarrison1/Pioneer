@@ -92,36 +92,41 @@ constexpr bool operator!=(Move m1, Move m2)
 struct MoveList
 {
     Move moves[256];
-    int size = 0;
+    Move* end = moves;
 
     void addMove(Move move)
     {
-        assert(size < 256);
-        moves[size++] = move;
+        assert(GetSize() < 256);
+        *end++ = move;
     }
 
     template <MoveType mType>
     void addMove(const Square& from, const Square& to)
     {
-        assert(size < 256);
-        moves[size++] = {from, to, mType};
+        assert(GetSize() < 256);
+        *end++ = {from, to, mType};
     }
 
     void clear()
     {
-        size = 0;
+        end = moves;
     }
 
     Move operator[](int index) const
     {
-        assert(index < size);
+        assert(index < GetSize());
         return moves[index];
     }
 
     Move& operator[](int index)
     {
-        assert(index < size);
+        assert(index < GetSize());
         return moves[index];
+    }
+
+    inline int GetSize() const
+    {
+        return end - moves;
     }
 };
 

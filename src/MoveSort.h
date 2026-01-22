@@ -47,7 +47,7 @@ struct MoveSorter
     MoveVal moveVals[256];
     unsigned int size;
 
-    MoveSorter(const Board& board, MoveList* mlist, Move best) : size(mlist->size)
+    MoveSorter(const Board& board, MoveList* mlist, Move best) : size(mlist->GetSize())
     {
         for (unsigned int i = 0; i < size; i++)
         {

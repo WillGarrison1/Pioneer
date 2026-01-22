@@ -160,10 +160,10 @@ Score qsearch(Board& board, int ply, Score alpha, Score beta)
     if (!board.getNumChecks()) // If not in check, generate captures
     {
         board.generateMoves<CAPTURE>(&moves);
-        if (!moves.size) // if no moves, check for stalemate
+        if (!moves.GetSize()) // if no moves, check for stalemate
         {
             board.generateMoves<ALL_MOVES>(&moves);
-            if (moves.size == 0)
+            if (!moves.GetSize())
                 return 0; // stalemate
             return pat;
         }
@@ -171,7 +171,7 @@ Score qsearch(Board& board, int ply, Score alpha, Score beta)
     else // if in check, generate evasions
     {
         board.generateMoves<ALL_MOVES>(&moves);
-        if (!moves.size) // if no moves, checkmate
+        if (!moves.GetSize()) // if no moves, checkmate
         {
             return -MATE + ply;
         }
@@ -294,7 +294,7 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
     MoveList moves;
     board.generateMoves<ALL_MOVES>(&moves); // compute moves here because generateMoves computes checks
 
-    if (moves.size == 0)
+    if (moves.GetSize() == 0)
     {
         if (board.getNumChecks()) // if in check, then checkmate
             return -MATE + ply;
@@ -432,7 +432,7 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
                 addKillerMove(board.getPly(), move);
                 addHistoryBonus(!board.whiteToMove, move, depth); // add move history bonus
 
-                for (int p = moves.size - i; p < moves.size; p++)
+                for (int p = moves.GetSize() - i; p < moves.GetSize(); p++)
                 {
                     Move penaltyMove = sorter.moveVals[p].m;
 
@@ -450,7 +450,7 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
                     victimType = PAWN;
                 addCaptureBonus(victimType, move, depth); // add move history bonus
 
-                for (int p = moves.size - i; p < moves.size; p++)
+                for (int p = moves.GetSize() - i; p < moves.GetSize(); p++)
                 {
                     Move penaltyMove = sorter.moveVals[p].m;
                     if (penaltyMove == move)
@@ -498,7 +498,7 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
     if (firstMove == bestM)
         pvHits++;
 
-    if (moves.size >= 2)
+    if (moves.GetSize() >= 2)
         orderingNodes++;
 
     if (bestM.getMove() == 0)     // if we didn't search a move (futility pruned all moves)
@@ -601,9 +601,9 @@ Move startSearch(Board& board, unsigned int depth, unsigned int nodes, unsigned 
 
         MoveList mlist;
         board.generateMoves<ALL_MOVES>(&mlist);
-        if (mlist.size > 30)
+        if (mlist.GetSize() > 30)
             maxTime *= 1.5;
-        else if (mlist.size < 10)
+        else if (mlist.GetSize() < 10)
             maxTime *= 0.75;
         else
             maxTime *= 0.9;

@@ -39,9 +39,9 @@ void Engine::makemove(Move move)
     MoveList legal;
     board->generateMoves<ALL_MOVES>(&legal);
 
-    for (int i = 0; i < legal.size; i++)
+    for (Move* mPtr = 0; mPtr < legal.end; mPtr++)
     {
-        Move m = legal.moves[i];
+        Move m = *mPtr;
         if (m.to() == move.to() && m.from() == move.from() &&
             ((m.type() == PROMOTION && move.promotion() == m.promotion()) || (m.type() != PROMOTION)))
         {
@@ -66,9 +66,9 @@ void Engine::goPerft(unsigned int depth)
     board->generateMoves<ALL_MOVES>(&moves);
     BoardState state;
 
-    for (int i = 0; i < moves.size; i++)
+    for (Move* mPtr = moves.moves; mPtr < moves.end; mPtr++)
     {
-        Move move = moves.moves[i];
+        Move move = *mPtr;
         board->makeMove(move, &state);
         unsigned long long count = perft(*board, depth - 1);
         board->undoMove();
@@ -95,9 +95,9 @@ void Engine::isCheck(Move move)
     MoveList legal;
     board->generateMoves<ALL_MOVES>(&legal);
 
-    for (int i = 0; i < legal.size; i++)
+    for (Move* mPtr = legal.moves; mPtr < legal.end; mPtr++)
     {
-        Move m = legal.moves[i];
+        Move m = *mPtr;
         if (m.to() == move.to() && m.from() == move.from() && m.promotion() == move.promotion())
         {
             std::cout << board->isCheckMove(m) << std::endl;

@@ -611,7 +611,7 @@ void Board::generateAttackBB(const Color side)
     const Bitboard enemyKing = getBB(~side, KING);
     const Bitboard blockers = getBB(ALL_PIECES) & ~enemyKing;
 
-    Bitboard pawns = getBB(side, PAWN);
+    const Bitboard pawns = getBB(side, PAWN);
     Bitboard knights = getBB(side, KNIGHT);
     Bitboard bishops = getBB(side, BISHOP);
     Bitboard rooks = getBB(side, ROOK);
@@ -624,24 +624,19 @@ void Board::generateAttackBB(const Color side)
 
     while (knights)
     {
-        Square from = popLSB(knights);
-        Bitboard moves = knightMoves[from];
-        attackBB |= moves;
+        attackBB |= knightMoves[popLSB(knights)];
     }
 
     while (bishops)
     {
         Square from = popLSB(bishops);
-        Bitboard moves = GetBishopMoves(blockers, from);
-
-        attackBB |= moves;
+        attackBB |= GetBishopMoves(blockers, from);
     }
 
     while (rooks)
     {
         Square from = popLSB(rooks);
-        Bitboard moves = GetRookMoves(blockers, from);
-        attackBB |= moves;
+        attackBB |= GetRookMoves(blockers, from);
     }
 
     while (queens)
@@ -655,7 +650,7 @@ void Board::generateAttackBB(const Color side)
     Square king = lsb(getBB(side, KING));
     attackBB |= kingMoves[king];
 
-    state->attacks[side == 8] = attackBB;
+    state->attacks[side == BLACK] = attackBB;
 }
 
 Bitboard Board::getAttackers(Square sqr)

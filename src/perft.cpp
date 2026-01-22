@@ -9,7 +9,7 @@ unsigned long long perft(Board& board, unsigned int depth)
 
     if (depth == 1)
     {
-        return moves.size;
+        return moves.GetSize();
     }
     else if (depth == 0)
     {
@@ -20,10 +20,9 @@ unsigned long long perft(Board& board, unsigned int depth)
 
     BoardState state;
 
-    for (int i = 0; i < moves.size; i++)
+    for (Move* m = moves.moves; m < moves.end; m++)
     {
-        Move move = moves.moves[i];
-        board.makeMove(move, &state);
+        board.makeMove(*m, &state);
         moveCount += perft(board, depth - 1);
         board.undoMove();
     }
