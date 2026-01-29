@@ -39,7 +39,7 @@ void Engine::makemove(Move move)
     MoveList legal;
     board->generateMoves<ALL_MOVES>(&legal);
 
-    for (Move* mPtr = 0; mPtr < legal.end; mPtr++)
+    for (Move* mPtr = legal.moves; mPtr < legal.end; mPtr++)
     {
         Move m = *mPtr;
         if (m.to() == move.to() && m.from() == move.from() &&
