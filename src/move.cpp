@@ -6,7 +6,6 @@
 
 Move::Move(const std::string str)
 {
-    Move move;
     File fFile = File(str[0] - 'a');
     Rank fRank = Rank(str[1] - '1');
 

@@ -99,12 +99,10 @@ void Board::movePiece(Square from, Square to)
     const Piece piece = board[from];
     const PieceType pieceType = getType(piece);
     const Color color = getColor(piece);
+    const Bitboard moveBB = sqrToBB(from) | sqrToBB(to);
 
-    clearBit(pieceBB[pieceType], from);
-    clearBit(colorBB[color], from);
-
-    setBit(pieceBB[pieceType], to);
-    setBit(colorBB[color], to);
+    colorBB[color] ^= moveBB;
+    pieceBB[pieceType] ^= moveBB;
 
     board[from] = EMPTY;
     board[to] = piece;
@@ -142,12 +140,10 @@ void Board::movePieceZobrist(Square from, Square to, Key& key)
     const Piece piece = board[from];
     const PieceType pieceType = getType(piece);
     const Color color = getColor(piece);
+    const Bitboard moveBB = sqrToBB(from) | sqrToBB(to);
 
-    clearBit(pieceBB[pieceType], from);
-    clearBit(colorBB[color], from);
-
-    setBit(pieceBB[pieceType], to);
-    setBit(colorBB[color], to);
+    colorBB[color] ^= moveBB;
+    pieceBB[pieceType] ^= moveBB;
 
     key ^= boardHashes[to][piece] ^ boardHashes[from][piece];
 
@@ -629,22 +625,20 @@ void Board::generateAttackBB(const Color side)
 
     while (bishops)
     {
-        Square from = popLSB(bishops);
+        const Square from = popLSB(bishops);
         attackBB |= GetBishopMoves(blockers, from);
     }
 
     while (rooks)
     {
-        Square from = popLSB(rooks);
+        const Square from = popLSB(rooks);
         attackBB |= GetRookMoves(blockers, from);
     }
 
     while (queens)
     {
-        Square from = popLSB(queens);
-        Bitboard moves = GetRookMoves(blockers, from) | GetBishopMoves(blockers, from);
-
-        attackBB |= moves;
+        const Square from = popLSB(queens);
+        attackBB |= GetRookMoves(blockers, from) | GetBishopMoves(blockers, from);
     }
 
     Square king = lsb(getBB(side, KING));
@@ -653,7 +647,7 @@ void Board::generateAttackBB(const Color side)
     state->attacks[side == BLACK] = attackBB;
 }
 
-Bitboard Board::getAttackers(Square sqr)
+Bitboard Board::getAttackers(const Square sqr) const
 {
     const Bitboard blockers = getBB(ALL_PIECES);
     const Bitboard pawns = getBB(~sideToMove, PAWN);
@@ -673,6 +667,24 @@ Bitboard Board::getAttackers(Square sqr)
                  pawns;
 
     return attackers;
+}
+
+bool Board::isAttacked(const Square sqr, const Color byColor) const
+{
+    if (pawnAttacks[~byColor][sqr] & getBB(byColor, PAWN))
+        return true;
+    if (knightMoves[sqr] & getBB(byColor, KNIGHT))
+        return true;
+
+    if (GetRookMoves(getBB(ALL_PIECES), sqr) & (getBB(byColor, ROOK, QUEEN)))
+        return true;
+    if (GetBishopMoves(getBB(ALL_PIECES), sqr) & (getBB(byColor, BISHOP, QUEEN)))
+        return true;
+
+    if (kingMoves[sqr] & getBB(byColor, KING))
+        return true;
+
+    return false;
 }
 
 // computes the attacked bitboards for boths sides and returns the check bitboard

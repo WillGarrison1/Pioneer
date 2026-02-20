@@ -87,7 +87,8 @@ class Board
     void generateAttackBB(const Color side);
     void computeAttackedBBs();
 
-    Bitboard getAttackers(Square sqr);
+    Bitboard getAttackers(const Square sqr) const;
+    bool isAttacked(const Square sqr, const Color byColor) const;
 
     void computePins(Bitboard& pinnedS, Bitboard& pinnedD);
 

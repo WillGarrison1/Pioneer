@@ -4,11 +4,11 @@
 #include "types.h"
 #include <cassert>
 
-const Bitboard emptyBB = 0ULL;
-const Bitboard fullBB = 0xFFFFFFFFFFFFFFFFULL;
+constexpr Bitboard emptyBB = 0ULL;
+constexpr Bitboard fullBB = 0xFFFFFFFFFFFFFFFFULL;
 
 // clang-format off
-alignas(64) const Bitboard rankBBs[] =
+alignas(64) constexpr Bitboard rankBBs[] =
     {
         0xFFULL,
         0xFF00ULL,
@@ -19,7 +19,7 @@ alignas(64) const Bitboard rankBBs[] =
         0xFF000000000000ULL,
         0xFF00000000000000ULL};
 
-alignas(64) const Bitboard fileBBs[] =
+alignas(64) constexpr Bitboard fileBBs[] =
     {
         0x0101010101010101ULL,
         0x0202020202020202ULL,
@@ -31,7 +31,7 @@ alignas(64) const Bitboard fileBBs[] =
         0x8080808080808080ULL};
 
 // Used for finding enemy attacks between castles
-alignas(64) const Bitboard castleBBs[] = {
+alignas(64) constexpr Bitboard castleBBs[] = {
     0x0000000000000000ULL,
     0x0000000000000060ULL, // Short white
     0x000000000000000CULL, // Long white
@@ -116,7 +116,7 @@ inline Square msb(const Bitboard bb)
 inline Square popLSB(Bitboard& bb)
 {
     Square bit = lsb(bb);
-    bb = bb & (bb - 1);
+    bb &= bb - 1;
     return bit;
 }
 

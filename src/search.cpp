@@ -41,7 +41,7 @@ unsigned long long startTime;
 
 bool isDone;
 
-constexpr auto logTable = [] {
+static const auto logTable = [] {
     std::array<float, 256> table{};
     table[0] = 0;
     for (int i = 1; i < 256; i++)
@@ -162,9 +162,6 @@ Score qsearch(Board& board, int ply, Score alpha, Score beta)
         board.generateMoves<CAPTURE>(&moves);
         if (!moves.GetSize()) // if no moves, check for stalemate
         {
-            board.generateMoves<ALL_MOVES>(&moves);
-            if (!moves.GetSize())
-                return 0; // stalemate
             return pat;
         }
     }
@@ -292,7 +289,7 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
     }
 
     MoveList moves;
-    board.generateMoves<ALL_MOVES>(&moves); // compute moves here because generateMoves computes checks
+    board.generateMoves<ALL_MOVES>(&moves);
 
     if (moves.GetSize() == 0)
     {
@@ -423,25 +420,13 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
                 }
             }
 
-            updateContinuationHistory(board, move, depth, false);
-
             if (move.isType<QUIET>())
             {
                 counterMove[board.getState()->move.from()][board.getState()->move.to()] = move;
 
                 addKillerMove(board.getPly(), move);
                 addHistoryBonus(!board.whiteToMove, move, depth); // add move history bonus
-
-                for (int p = moves.GetSize() - i; p < moves.GetSize(); p++)
-                {
-                    Move penaltyMove = sorter.moveVals[p].m;
-
-                    if (penaltyMove == move)
-                        continue;
-                    if (penaltyMove.isType<QUIET>())
-                        addHistoryPenalty(!board.whiteToMove, penaltyMove, depth);
-                    updateContinuationHistory(board, penaltyMove, depth, true);
-                }
+                updateContinuationHistory(board, move, depth, false);
             }
             else if (move.isType<CAPTURE>())
             {
@@ -449,20 +434,25 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
                 if (move.to() == board.getEnPassantSqr())
                     victimType = PAWN;
                 addCaptureBonus(victimType, move, depth); // add move history bonus
+            }
 
-                for (int p = moves.GetSize() - i; p < moves.GetSize(); p++)
+            for (int p = moves.GetSize() - i; p < moves.GetSize(); p++)
+            {
+                Move penaltyMove = sorter.moveVals[p].m;
+                if (penaltyMove == move)
+                    continue;
+
+                if (penaltyMove.isType<QUIET>())
                 {
-                    Move penaltyMove = sorter.moveVals[p].m;
-                    if (penaltyMove == move)
-                        continue;
-                    if (penaltyMove.isType<CAPTURE>())
-                    {
-                        victimType = getType(board.getSQ(penaltyMove.to()));
-                        if (penaltyMove.to() == board.getEnPassantSqr())
-                            victimType = PAWN;
-                        addCapturePenalty(victimType, penaltyMove, depth);
-                    }
+                    addHistoryPenalty(!board.whiteToMove, penaltyMove, depth);
                     updateContinuationHistory(board, penaltyMove, depth, true);
+                }
+                else if (penaltyMove.isType<CAPTURE>())
+                {
+                    PieceType victimType = getType(board.getSQ(penaltyMove.to()));
+                    if (penaltyMove.to() == board.getEnPassantSqr())
+                        victimType = PAWN;
+                    addCapturePenalty(victimType, penaltyMove, depth);
                 }
             }
 
