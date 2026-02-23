@@ -238,5 +238,5 @@ Score Eval<FULL>(Board& board)
 template <>
 Score Eval<FAST>(Board& board)
 {
-    return Evaluate<FAST>(board);
+    return (board.getPawnMaterial() + board.getNonPawnMaterial()) * (board.whiteToMove ? 1 : -1);
 }

@@ -1,5 +1,3 @@
-#define PERFT
-
 #include "uci.h"
 
 #ifndef MAGIC_GEN

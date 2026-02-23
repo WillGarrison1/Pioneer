@@ -75,6 +75,8 @@ class TranspositionTable
 
     void Clear();
 
+    void Prefetch(Key zobrist);
+
     inline unsigned char GetAge()
     {
         return age;
