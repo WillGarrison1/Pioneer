@@ -9,7 +9,7 @@ Key castleRightsHash[16];
 Key enPassantHash[8];
 
 TranspositionTable* tTable =
-    new (std::align_val_t(64)) TranspositionTable(1024 * 1024 * 64); // transposition table with a size of 64 MB
+    new (std::align_val_t(64)) TranspositionTable(1024 * 1024 * 256); // transposition table with a size of 64 MB
 
 void TranspositionEntry::Set(Key key, Score score, Move move, unsigned char depth, unsigned char age, NodeBound bound)
 {
@@ -117,6 +117,12 @@ void TranspositionTable::Clear()
 {
     age = 0;
     std::memset(this->buckets, 0, this->numBuckets * sizeof(TranspositionBucket));
+}
+
+void TranspositionTable::Prefetch(Key zobrist)
+{
+    unsigned long long index = zobrist & (this->numBuckets - 1); // much faster than modulo
+    __builtin_prefetch(&this->buckets[index], 0, 1);
 }
 
 void InitZobrist()

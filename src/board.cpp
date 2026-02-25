@@ -445,11 +445,13 @@ unsigned int Board::getRepetition() const
     Key zobrist = state->zobristHash;
 
     BoardState* currState = state->prev;
-    while (currState != nullptr)
+    while (currState && currState->prev)
     {
         if (currState->zobristHash == zobrist)
             return currState->repetition + 1;
-        currState = currState->prev;
+        if (currState->move50rule == 0)
+            break;
+        currState = currState->prev->prev;
     }
 
     return 1;
