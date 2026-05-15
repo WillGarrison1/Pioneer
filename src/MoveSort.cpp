@@ -2,7 +2,7 @@
 
 alignas(64) Move killerMoves[MAX_PLY][2]; // each ply can have two killer moves
 alignas(64) Move counterMove[64][64];
-alignas(64) int moveHistory[2][64][64];                  // History for [isBlack][from][to]
+alignas(64) int moveHistory[2][64][64];                  // History for [isWhite][from][to]
 alignas(64) int captureHistory[64][64][PieceType::KING]; // indexed as [from][to][victimPieceType-1]
 alignas(64) int continuationHistory[CONTINUATION_HISTORY_SIZE][6][64][6][64];
 
