@@ -386,7 +386,7 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
 
         Move move = sorter.Next();
 
-        if (move.isType<QUIET>())
+        if (!isPVNode && !board.getNumChecks() && move.isType<QUIET>())
         {
             if (lmpCount++ >= lmpThreshold) // lmp
                 continue;
@@ -476,7 +476,7 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
 
                 if (penaltyMove.isType<QUIET>())
                 {
-                    addHistoryPenalty(!board.whiteToMove, penaltyMove, depth);
+                    addHistoryPenalty(board.whiteToMove, penaltyMove, depth);
                     updateContinuationHistory(board, penaltyMove, depth, true);
                 }
                 else if (penaltyMove.isType<CAPTURE>())
