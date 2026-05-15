@@ -41,12 +41,15 @@ unsigned long long startTime;
 
 bool isDone;
 
-constexpr auto logTable = [] {
-    std::array<float, 256> table{};
-    table[0] = 0;
-    for (int i = 1; i < 256; i++)
-        table[i] = std::log(i);
-
+constexpr auto lmrTable = [] {
+    std::array<std::array<int, 256>, MAX_DEPTH> table{};
+    for (int d = 0; d < MAX_DEPTH; d++)
+    {
+        for (int m = 0; m < 256; m++)
+        {
+            table[d][m] = 0.75f + std::log(d > 0 ? d : 1) * std::log(m > 0 ? m : 1) / 2.25f;
+        }
+    }
     return table;
 }();
 
@@ -103,7 +106,7 @@ void UpdatePV(PVLine* line, Move move, PVLine* prev)
  */
 constexpr int LMRReduction(int depth, int moveNum)
 {
-    return 0.75f + logTable[depth] * logTable[moveNum] / 2.25f;
+    return lmrTable[depth][moveNum];
 }
 
 std::string GetMoveListString(PVLine* l)
@@ -228,7 +231,8 @@ Score qsearch(Board& board, int ply, Score alpha, Score beta)
 }
 
 template <NodeType node>
-Score search(Board &board, int depth, int ply, Score alpha, Score beta, PVLine *prevLine, const bool nullMoveAllowed = true)
+Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* prevLine,
+             const bool nullMoveAllowed = true)
 {
     if (isDone)
         return 0;
@@ -341,7 +345,8 @@ Score search(Board &board, int depth, int ply, Score alpha, Score beta, PVLine *
     // null move pruning
 
     int numEnemyPieces = popCount(board.getBB(ALL_PIECES, ~board.sideToMove) & ~board.getBB(PAWN));
-    if (!isPVNode && numEnemyPieces > 0 && board.getNumChecks() == 0 && depth >= NULL_DEPTH && !isLoss(beta) && nullMoveAllowed)
+    if (!isPVNode && numEnemyPieces > 0 && board.getNumChecks() == 0 && depth >= NULL_DEPTH && !isLoss(beta) &&
+        nullMoveAllowed && staticEval >= beta)
     {
         PVLine line;
 
@@ -372,8 +377,9 @@ Score search(Board &board, int depth, int ply, Score alpha, Score beta, PVLine *
     Move bestM = 0;
 
     NodeBound nodeBound = NodeBound::Upper;
-    Move firstMove;
+    Move firstMove = 0;
     int lmpCount = 0;
+    const int lmpThreshold = 3 + 2 * depth * depth;
     for (int i = 0; sorter.size != 0; i++)
     {
         PVLine line;
@@ -382,7 +388,7 @@ Score search(Board &board, int depth, int ply, Score alpha, Score beta, PVLine *
 
         if (move.isType<QUIET>())
         {
-            if (lmpCount++ >= 10 && depth < 12) // lmp
+            if (lmpCount++ >= lmpThreshold) // lmp
                 continue;
         }
         int extension = 0;
@@ -451,7 +457,7 @@ Score search(Board &board, int depth, int ply, Score alpha, Score beta, PVLine *
                 counterMove[board.getState()->move.from()][board.getState()->move.to()] = move;
 
                 addKillerMove(board.getPly(), move);
-                addHistoryBonus(!board.whiteToMove, move, depth); // add move history bonus
+                addHistoryBonus(board.whiteToMove, move, depth); // add move history bonus
                 updateContinuationHistory(board, move, depth, false);
             }
             else if (move.isType<CAPTURE>())
@@ -504,7 +510,7 @@ Score search(Board &board, int depth, int ply, Score alpha, Score beta, PVLine *
             if (node == RootNode)
             {
                 bestMove = move;
-                std::cout << "info depth " << depth << " curmov " << bestMove.toString() << " score cp " << score
+                std::cout << "info depth " << depth << " best " << bestMove.toString() << " score cp " << score
                           << " nodes " << numNodes + numQNodes << " pv " << GetMoveListString(prevLine) << std::endl;
             }
         }
