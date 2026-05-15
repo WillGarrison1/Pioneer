@@ -32,10 +32,9 @@ MoveVal ScoreMove(const Board& board, Move m)
     {
         v.score = COUNTERMOVE_BONUS;
     }
-
-    else if (m.isType<QUIET>())
+    else
     {
-        v.score += moveHistory[board.sideToMove == BLACK][m.from()][m.to()] * 2;
+        v.score += moveHistory[board.whiteToMove][m.from()][m.to()];
         const BoardState* prevState = board.getState();
         PieceType moved = getType(board.getSQ(m.from()));
         for (int i = 0; i < CONTINUATION_HISTORY_SIZE; i++)
@@ -68,7 +67,7 @@ MoveVal ScoreMoveQ(const Board& board, Move m)
 
     v.score += 2 * captureHistory[m.from()][m.to()][victimType - 1] + pieceScores[victimType] * 4;
 
-    v.score += Mvv_Lva_Score(board, m) + CAPTURE_BONUS; 
+    v.score += Mvv_Lva_Score(board, m) + CAPTURE_BONUS;
 
     if (sqrToBB(m.to()) & board.getAttacked(~board.sideToMove)) // penalty for moving piece to attacked square
         v.score += ATTACKED_PENALTY - pieceScores[pType];

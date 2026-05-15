@@ -89,7 +89,7 @@ struct MoveSorter
 };
 
 extern Move killerMoves[MAX_PLY][2];                // each ply can have two killer moves
-extern int moveHistory[2][64][64];                  // History for [isBlack][from][to]
+extern int moveHistory[2][64][64];                  // History for [isWhite][from][to]
 extern int captureHistory[64][64][PieceType::KING]; // same as moveHistory
 extern Move counterMove[64][64];
 extern int continuationHistory[CONTINUATION_HISTORY_SIZE][6][64][6][64];
@@ -124,19 +124,18 @@ inline void updateContinuationHistory(Board& board, Move m, int depth, bool nega
     }
 }
 
-inline void addHistoryBonus(bool isBlack, Move m, int depth)
+inline void addHistoryBonus(bool isWhite, Move m, int depth)
 {
     int clampedBonus = std::clamp(depth * depth * depth, -MAX_HISTORY, MAX_HISTORY);
-    moveHistory[isBlack][m.from()][m.to()] +=
-        clampedBonus - moveHistory[isBlack][m.from()][m.to()] * std::abs(clampedBonus) / MAX_HISTORY;
+    moveHistory[isWhite][m.from()][m.to()] +=
+        clampedBonus - moveHistory[isWhite][m.from()][m.to()] * std::abs(clampedBonus) / MAX_HISTORY;
 }
 
-inline void addHistoryPenalty(bool isBlack, Move m, int depth)
+inline void addHistoryPenalty(bool isWhite, Move m, int depth)
 {
-
     const int penalty = std::clamp(depth * depth * depth, -MAX_HISTORY, MAX_HISTORY);
-    auto gravity = moveHistory[isBlack][m.from()][m.to()] * std::abs(penalty) / MAX_HISTORY;
-    moveHistory[isBlack][m.from()][m.to()] -= penalty + gravity;
+    auto gravity = moveHistory[isWhite][m.from()][m.to()] * std::abs(penalty) / MAX_HISTORY;
+    moveHistory[isWhite][m.from()][m.to()] -= penalty + gravity;
 }
 
 inline void addCaptureBonus(PieceType victimType, Move m, int depth)

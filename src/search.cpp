@@ -269,26 +269,25 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
     if (entry)
     {
         ttHits++;
+        staticEval = ttToMate(entry->score, ply);
         if (entry->depth >= depth)
         {
-            Score corrected = ttToMate(entry->score, ply);
             if ((entry->getNodeBound() == NodeBound::Exact ||
-                 (entry->getNodeBound() == NodeBound::Upper && corrected <= alpha) ||
-                 (entry->getNodeBound() == NodeBound::Lower && corrected >= beta)))
+                 (entry->getNodeBound() == NodeBound::Upper && staticEval <= alpha) ||
+                 (entry->getNodeBound() == NodeBound::Lower && staticEval >= beta)))
             {
                 if constexpr (!isPVNode)
                 {
                     entry->setAge(tTable->GetAge()); // reset the age for this node
-                    return corrected;
+                    return staticEval;
                 }
-                staticEval = corrected;
             }
             else if (!isPVNode)
             {
                 if (entry->getNodeBound() == NodeBound::Lower)
-                    alpha = std::max(alpha, corrected);
+                    alpha = std::max(alpha, staticEval);
                 else if (entry->getNodeBound() == NodeBound::Upper)
-                    beta = std::min(beta, corrected);
+                    beta = std::min(beta, staticEval);
             }
         }
 
