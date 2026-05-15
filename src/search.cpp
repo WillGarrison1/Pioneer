@@ -146,13 +146,7 @@ Score qsearch(Board& board, int ply, Score alpha, Score beta)
     }
 
     Score originalAlpha = alpha;
-    Score pat = Eval<FULL>(board);
-
-    if (pat >= beta)
-        return pat;
-
-    if (alpha < pat)
-        alpha = pat;
+    Score pat = 0;
 
     // Generate moves
 
@@ -160,10 +154,17 @@ Score qsearch(Board& board, int ply, Score alpha, Score beta)
     if (!board.getNumChecks()) // If not in check, generate captures
     {
         board.generateMoves<CAPTURE>(&moves);
-        if (!moves.GetSize()) // if no moves, check for stalemate
+        pat = Eval<FULL>(board);
+        if (!moves.GetSize())
         {
             return pat;
         }
+
+        if (pat >= beta)
+            return pat;
+
+        if (alpha < pat)
+            alpha = pat;
     }
     else // if in check, generate evasions
     {
@@ -172,6 +173,7 @@ Score qsearch(Board& board, int ply, Score alpha, Score beta)
         {
             return -MATE + ply;
         }
+        pat = -MATE; // in check
     }
 
     MoveSorter sorter(board, &moves, bestEntryMove);
@@ -180,7 +182,7 @@ Score qsearch(Board& board, int ply, Score alpha, Score beta)
     Move bestM = 0;
     BoardState state;
 
-    for (; sorter.size != 0;)
+    while (sorter.size)
     {
         Move m = sorter.Next();
 
@@ -258,7 +260,8 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
     Move bestEntryMove = 0;
 
     TranspositionEntry* entry = tTable->GetEntry(board.getHash());
-    Score staticEval;
+    Score staticEval = Eval<FAST>(board);
+
     if (entry)
     {
         ttHits++;
@@ -287,13 +290,11 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
 
         bestEntryMove = entry->move;
     }
-    else
+    else if (!isPVNode && depth > IIR_DEPTH)
     {
-        staticEval = Eval<FAST>(board);
 
         // Internal Iterative Reduction if no hashmove found (reduce depth by one)
-        if (!isPVNode && depth > IIR_DEPTH)
-            depth--;
+        depth--;
     }
 
     if (depth == 0)
@@ -345,6 +346,7 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
         PVLine line;
 
         board.makeNullMove(&state);
+        tTable->Prefetch(board.getHash());
         Score nullScore = -search<CUTNode>(board, depth * 2 / 3 - 1, ply + 1, -beta, -beta + 1, &line);
         board.undoNullMove();
         if (nullScore >= beta)
@@ -372,7 +374,7 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
 
         if (move.isType<QUIET>())
         {
-            if (lmpCount++ >= 10 && depth < 12)
+            if (lmpCount++ >= 10 && depth < 12) // lmp
                 continue;
         }
         int extension = 0;
@@ -452,7 +454,7 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
                 addCaptureBonus(victimType, move, depth); // add move history bonus
             }
 
-            for (int p = moves.GetSize() - i; p < moves.GetSize(); p++)
+            for (unsigned int p = moves.GetSize() - i; p < moves.GetSize(); p++)
             {
                 Move penaltyMove = sorter.moveVals[p].m;
                 if (penaltyMove == move)

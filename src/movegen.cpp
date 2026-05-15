@@ -11,6 +11,36 @@
 #include "profile.h"
 #include "square.h"
 
+// #undef __SSE2__
+
+#ifdef __SSE2__
+
+#include <immintrin.h>
+inline __m128i GatherSquares(Bitboard bb)
+{
+    uint16_t squares[8] = {0};
+    int i = 0;
+    while (bb && i < 8)
+    {
+        squares[i++] = popLSB(bb);
+    }
+
+    // Load into 128-bit SIMD register
+    return _mm_loadu_si128((__m128i*)squares);
+}
+
+inline void AddMoves128(MoveList* mList, __m128i to, __m128i from, uint16_t flags, uint32_t count)
+{
+    __m128i flagsBroadcast = _mm_set1_epi16(flags << 12);
+    __m128i fromToMoves = _mm_or_si128(_mm_slli_epi16(to, 6), from);
+    __m128i moves = _mm_or_si128(flagsBroadcast, fromToMoves);
+
+    assert(mList->GetSize() + count <= 256);
+    _mm_storeu_si128((__m128i*)mList->end, moves);
+    mList->end += count;
+}
+
+#endif
 struct MovegenMasks
 {
     Bitboard checkBB; // check bitboard
@@ -80,6 +110,11 @@ void generatePawnMoves(const Board& board, MoveList* list, MovegenMasks* masks)
     constexpr Direction forwardWest = forward + WEST;
     constexpr Direction forwardEast = forward + EAST;
 
+#ifdef __SSE2__
+    const __m128i fowardDoubleDir128 = _mm_set1_epi16(doubleForward);
+    const __m128i forwardDir128 = _mm_set1_epi16(forward);
+#endif
+
     const Bitboard pawns = board.getBB(color, PAWN);
     const Bitboard empty = board.getBB(EMPTY);
     const Bitboard enemy = board.getBB(~color);
@@ -117,6 +152,14 @@ void generatePawnMoves(const Board& board, MoveList* list, MovegenMasks* masks)
             list->addMove(Move(from, to, PROMOTION, KNIGHT));
         }
 
+#ifdef __SSE2__
+        auto doubleTo = GatherSquares(doublePushes);
+        auto singleTo = GatherSquares(singlePushes);
+        auto doubleFrom = _mm_sub_epi16(doubleTo, fowardDoubleDir128);
+        auto singleFrom = _mm_sub_epi16(singleTo, forwardDir128);
+        AddMoves128(list, doubleTo, doubleFrom, QUIET, popCount(doublePushes));
+        AddMoves128(list, singleTo, singleFrom, QUIET, popCount(singlePushes));
+#else
         while (doublePushes)
         {
             const Square to = popLSB(doublePushes);
@@ -132,6 +175,7 @@ void generatePawnMoves(const Board& board, MoveList* list, MovegenMasks* masks)
 
             list->addMove<QUIET>(from, to);
         }
+#endif
     }
 
     const Bitboard attacksWestPinned =
@@ -218,7 +262,6 @@ void generatePawnMoves(const Board& board, MoveList* list, MovegenMasks* masks)
 }
 
 // Knight move generation
-
 template <MoveType mType, Color color>
 void generateKnightMoves(const Board& board, MoveList* list, MovegenMasks* masks)
 {
@@ -232,8 +275,8 @@ void generateKnightMoves(const Board& board, MoveList* list, MovegenMasks* masks
 
         const Bitboard moves = knightMoves[from] & masks->checkBB;
         Bitboard captures = moves & board.getBB(~color);
-        BitboardToMoves<CAPTURE>(from, captures, list);
 
+        BitboardToMoves<CAPTURE>(from, captures, list);
         if constexpr (mType == ALL_MOVES)
         {
             Bitboard quiets = moves & ~board.getBB(ALL_PIECES);

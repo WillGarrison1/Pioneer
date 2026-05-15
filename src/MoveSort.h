@@ -67,9 +67,9 @@ struct MoveSorter
     Move Next()
     {
         int bestIndex = 0;
-        int bestScore = -1000000;
+        int bestScore = moveVals[0].score;
 
-        for (unsigned int i = 0; i < size; i++)
+        for (unsigned int i = 1; i < size; i++)
         {
             if (moveVals[i].score > bestScore)
             {

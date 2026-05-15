@@ -84,7 +84,8 @@ class Board
     // Clears bitboards and board
     void clear();
 
-    void generateAttackBB(const Color side);
+    template <Color side>
+    void generateAttackBB();
     void computeAttackedBBs();
 
     Bitboard getAttackers(const Square sqr) const;

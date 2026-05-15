@@ -602,12 +602,12 @@ void Board::setFen(const std::string& fen, BoardState* newState)
 }
 
 // Updates attacked bitboard and returns number of checks of the opposing king
-void Board::generateAttackBB(const Color side)
+template <Color side>
+void Board::generateAttackBB()
 {
     PROFILE_FUNC();
-    const Direction forward = side == WHITE ? NORTH : SOUTH;
-    const Bitboard enemyKing = getBB(~side, KING);
-    const Bitboard blockers = getBB(ALL_PIECES) & ~enemyKing;
+    constexpr Direction forward = side == WHITE ? NORTH : SOUTH;
+    const Bitboard blockers = getBB(ALL_PIECES) & ~getBB(~side, KING);
 
     const Bitboard pawns = getBB(side, PAWN);
     Bitboard knights = getBB(side, KNIGHT);
@@ -692,10 +692,20 @@ bool Board::isAttacked(const Square sqr, const Color byColor) const
 // computes the attacked bitboards for boths sides and returns the check bitboard
 void Board::computeAttackedBBs()
 {
-    generateAttackBB(~sideToMove);
+    if (whiteToMove)
+    {
+        generateAttackBB<BLACK>();
 #ifndef PERFT
-    generateAttackBB(sideToMove);
+        generateAttackBB<WHITE>();
 #endif
+    }
+    else
+    {
+        generateAttackBB<WHITE>();
+#ifndef PERFT
+        generateAttackBB<BLACK>();
+#endif
+    }
 }
 
 void Board::computePins(Bitboard& pinnedS, Bitboard& pinnedD)

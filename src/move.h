@@ -92,6 +92,7 @@ constexpr bool operator!=(Move m1, Move m2)
 struct MoveList
 {
     alignas(64) Move moves[256];
+    uint16_t buffer[8]; // padding to prevent SIMD stores from overflowing
     Move* end = moves;
 
     inline void addMove(Move move)
@@ -124,7 +125,7 @@ struct MoveList
         return moves[index];
     }
 
-    inline int GetSize() const
+    inline unsigned int GetSize() const
     {
         return end - moves;
     }
