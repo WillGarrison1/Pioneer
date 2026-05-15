@@ -88,6 +88,7 @@ class Board
     void generateAttackBB();
     void computeAttackedBBs();
 
+    template <Color side>
     Bitboard getAttackers(const Square sqr) const;
     bool isAttacked(const Square sqr, const Color byColor) const;
 

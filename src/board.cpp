@@ -36,7 +36,7 @@ BoardState::BoardState()
     prev = nullptr;
 }
 
-BoardState::BoardState(BoardState* prev)
+BoardState::BoardState(BoardState *prev)
 {
     this->attacks[0] = 0ULL;
     this->attacks[1] = 0ULL;
@@ -65,6 +65,7 @@ Board::Board()
 
     whiteToMove = true;
     sideToMove = WHITE;
+    ply = 0;
 }
 
 Board::~Board()
@@ -108,7 +109,7 @@ void Board::movePiece(Square from, Square to)
     board[to] = piece;
 }
 
-void Board::addPieceZobrist(Piece piece, Square square, Key& key)
+void Board::addPieceZobrist(Piece piece, Square square, Key &key)
 {
     const PieceType pieceType = getType(piece);
     const Color color = getColor(piece);
@@ -121,7 +122,7 @@ void Board::addPieceZobrist(Piece piece, Square square, Key& key)
     board[square] = piece;
 }
 
-void Board::removePieceZobrist(Square square, Key& key)
+void Board::removePieceZobrist(Square square, Key &key)
 {
     const Piece piece = board[square];
     const PieceType pieceType = getType(piece);
@@ -135,7 +136,7 @@ void Board::removePieceZobrist(Square square, Key& key)
     board[square] = EMPTY;
 }
 
-void Board::movePieceZobrist(Square from, Square to, Key& key)
+void Board::movePieceZobrist(Square from, Square to, Key &key)
 {
     const Piece piece = board[from];
     const PieceType pieceType = getType(piece);
@@ -151,7 +152,7 @@ void Board::movePieceZobrist(Square from, Square to, Key& key)
     board[to] = piece;
 }
 
-void Board::makeMove(Move move, BoardState* newState)
+void Board::makeMove(Move move, BoardState *newState)
 {
     PROFILE_FUNC();
 
@@ -329,7 +330,11 @@ void Board::makeMove(Move move, BoardState* newState)
     state->repetition = getRepetition();
 
     computeAttackedBBs();
-    state->checkers = getAttackers(lsb(getBB(sideToMove, KING)));
+    if (whiteToMove)
+        state->checkers = getAttackers<BLACK>(lsb(getBB(WHITE, KING)));
+    else
+        state->checkers = getAttackers<WHITE>(lsb(getBB(BLACK, KING)));
+
     // assert(getBB(sideToMove, KING) != 0);
 }
 
@@ -381,7 +386,7 @@ void Board::undoMove()
         const Square from = move.from();
         const Square to = move.to();
 
-        if (move.type() == PROMOTION)
+        if (move.isType<PROMOTION>())
         {
             addPiece(makePiece(PAWN, getColor(board[to])), from);
             removePiece(to);
@@ -411,7 +416,7 @@ void Board::undoMove()
     ply--;
 }
 
-void Board::makeNullMove(BoardState* newState)
+void Board::makeNullMove(BoardState *newState)
 {
     *newState = *state;
     newState->prev = state;
@@ -419,6 +424,7 @@ void Board::makeNullMove(BoardState* newState)
 
     state->move = 0;
     state->checkers = 0;
+    this->ply++;
 
     if (state->enPassantSquare != SQ_NONE) // if enPassant square from last move, remove it from zobrist
         state->zobristHash ^= enPassantHash[getFile(getEnPassantSqr())];
@@ -438,13 +444,14 @@ void Board::undoNullMove()
     whiteToMove = !whiteToMove;
     sideToMove = ~sideToMove;
     state = state->prev;
+    this->ply--;
 }
 
 unsigned int Board::getRepetition() const
 {
     Key zobrist = state->zobristHash;
 
-    BoardState* currState = state->prev;
+    BoardState *currState = state->prev;
     while (currState && currState->prev)
     {
         if (currState->zobristHash == zobrist)
@@ -504,7 +511,7 @@ void Board::clear()
     }
 }
 
-void Board::setFen(const std::string& fen, BoardState* newState)
+void Board::setFen(const std::string &fen, BoardState *newState)
 {
     clear();
 
@@ -598,7 +605,10 @@ void Board::setFen(const std::string& fen, BoardState* newState)
         state->move50rule = std::atoi(noActionRule50.c_str());
 
     computeAttackedBBs();
-    state->checkers = getAttackers(lsb(getBB(sideToMove, KING)));
+    if (whiteToMove)
+        state->checkers = getAttackers<BLACK>(lsb(getBB(WHITE, KING)));
+    else
+        state->checkers = getAttackers<WHITE>(lsb(getBB(BLACK, KING)));
 }
 
 // Updates attacked bitboard and returns number of checks of the opposing king
@@ -649,21 +659,22 @@ void Board::generateAttackBB()
     state->attacks[side == BLACK] = attackBB;
 }
 
+template <Color side>
 Bitboard Board::getAttackers(const Square sqr) const
 {
     const Bitboard blockers = getBB(ALL_PIECES);
-    const Bitboard pawns = getBB(~sideToMove, PAWN);
-    const Bitboard knights = getBB(~sideToMove, KNIGHT);
-    const Bitboard bishops = getBB(~sideToMove, BISHOP);
-    const Bitboard rooks = getBB(~sideToMove, ROOK);
-    const Bitboard queens = getBB(~sideToMove, QUEEN);
+    const Bitboard pawns = getBB(side, PAWN);
+    const Bitboard knights = getBB(side, KNIGHT);
+    const Bitboard bishops = getBB(side, BISHOP);
+    const Bitboard rooks = getBB(side, ROOK);
+    const Bitboard queens = getBB(side, QUEEN);
 
     Bitboard attackers = 0ULL;
     attackers |= GetBishopMoves(blockers, sqr) & (bishops | queens);
     attackers |= GetRookMoves(blockers, sqr) & (rooks | queens);
     attackers |= knightMoves[sqr] & knights;
 
-    Direction forward = whiteToMove ? NORTH : SOUTH;
+    Direction forward = static_cast<Direction>((side << 1) - 8);
     attackers |= (shift(sqrToBB(sqr) & ~fileBBs[FILE_A], forward + WEST) |
                   shift(sqrToBB(sqr) & ~fileBBs[FILE_H], forward + EAST)) &
                  pawns;
@@ -708,7 +719,7 @@ void Board::computeAttackedBBs()
     }
 }
 
-void Board::computePins(Bitboard& pinnedS, Bitboard& pinnedD)
+void Board::computePins(Bitboard &pinnedS, Bitboard &pinnedD)
 {
     pinnedS = pinnedD = 0ULL;
 

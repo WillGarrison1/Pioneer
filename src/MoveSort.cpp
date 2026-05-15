@@ -6,7 +6,7 @@ alignas(64) int moveHistory[2][64][64];                  // History for [isWhite
 alignas(64) int captureHistory[64][64][PieceType::KING]; // indexed as [from][to][victimPieceType-1]
 alignas(64) int continuationHistory[CONTINUATION_HISTORY_SIZE][6][64][6][64];
 
-MoveVal ScoreMove(const Board& board, Move m)
+MoveVal ScoreMove(const Board &board, Move m)
 {
     const Piece piece = board.getSQ(m.from());
     const PieceType pType = getType(piece);
@@ -26,16 +26,16 @@ MoveVal ScoreMove(const Board& board, Move m)
     }
     else if (killerMoves[board.getPly()][1] == m)
     {
-        v.score = KILLER_MOVE_BONUS - 1000;
+        v.score = KILLER_MOVE_BONUS - 10;
     }
-    else if (counterMove[prevMove.from()][prevMove.to()] == m)
+    else if (prevMove.getMove() && counterMove[prevMove.from()][prevMove.to()] == m)
     {
         v.score = COUNTERMOVE_BONUS;
     }
     else
     {
         v.score += moveHistory[board.whiteToMove][m.from()][m.to()];
-        const BoardState* prevState = board.getState();
+        const BoardState *prevState = board.getState();
         PieceType moved = getType(board.getSQ(m.from()));
         for (int i = 0; i < CONTINUATION_HISTORY_SIZE; i++)
         {
@@ -55,7 +55,7 @@ MoveVal ScoreMove(const Board& board, Move m)
     return v;
 }
 
-MoveVal ScoreMoveQ(const Board& board, Move m)
+MoveVal ScoreMoveQ(const Board &board, Move m)
 {
     MoveVal v = {m, 0};
     PieceType pType = getType(board.getSQ(m.from()));
@@ -72,7 +72,7 @@ MoveVal ScoreMoveQ(const Board& board, Move m)
     if (sqrToBB(m.to()) & board.getAttacked(~board.sideToMove)) // penalty for moving piece to attacked square
         v.score += ATTACKED_PENALTY - pieceScores[pType];
 
-    const BoardState* prevState = board.getState();
+    const BoardState *prevState = board.getState();
     PieceType moved = getType(board.getSQ(m.from()));
     for (int i = 0; i < CONTINUATION_HISTORY_SIZE; i++)
     {

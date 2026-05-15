@@ -41,7 +41,8 @@ unsigned long long startTime;
 
 bool isDone;
 
-constexpr auto lmrTable = [] {
+constexpr auto lmrTable = []
+{
     std::array<std::array<int, 256>, MAX_DEPTH> table{};
     for (int d = 0; d < MAX_DEPTH; d++)
     {
@@ -86,7 +87,7 @@ inline Score ttToMate(Score s, unsigned char ply)
     return isWin(s) ? s - ply : (isLoss(s) ? s + ply : s);
 }
 
-void UpdatePV(PVLine* line, Move move, PVLine* prev)
+void UpdatePV(PVLine *line, Move move, PVLine *prev)
 {
     prev->moves[0] = move;
     for (unsigned int i = 0; i < line->len; i++)
@@ -109,7 +110,7 @@ constexpr int LMRReduction(int depth, int moveNum)
     return lmrTable[depth][moveNum];
 }
 
-std::string GetMoveListString(PVLine* l)
+std::string GetMoveListString(PVLine *l)
 {
     std::string moves;
     for (unsigned int i = 0; i < l->len; i++)
@@ -120,7 +121,7 @@ std::string GetMoveListString(PVLine* l)
     return moves;
 }
 
-Score qsearch(Board& board, int ply, Score alpha, Score beta)
+Score qsearch(Board &board, int ply, Score alpha, Score beta)
 {
     PROFILE_FUNC();
     numQNodes++;
@@ -132,7 +133,7 @@ Score qsearch(Board& board, int ply, Score alpha, Score beta)
     if (board.getState()->move50rule == 100)
         return 0; // 50-move draw
 
-    TranspositionEntry* entry = tTable->GetEntry(board.getHash());
+    TranspositionEntry *entry = tTable->GetEntry(board.getHash());
     Move bestEntryMove = 0;
     if (entry)
     {
@@ -231,9 +232,12 @@ Score qsearch(Board& board, int ply, Score alpha, Score beta)
 }
 
 template <NodeType node>
-Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* prevLine,
+Score search(Board &board, int depth, int ply, Score alpha, Score beta, PVLine *prevLine,
              const bool nullMoveAllowed = true)
 {
+    constexpr bool isPVNode = node == PVNode || node == RootNode;
+    constexpr bool isRootNode = node == RootNode;
+
     if (isDone)
         return 0;
 
@@ -248,12 +252,6 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
         isDone = true;
         return 0;
     }
-    numNodes++;
-
-    prevLine->len = 0;
-
-    constexpr bool isPVNode = node == PVNode || node == RootNode;
-    constexpr bool isRootNode = node == RootNode;
 
     if (!isRootNode && board.getState()->repetition == 3)
         return 0; // draw by repetition
@@ -261,49 +259,56 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
     if (!isRootNode && board.getState()->move50rule == 100)
         return 0; // 50 fullmoves have been made
 
+    if (depth == 0)
+    {
+        return qsearch(board, ply, alpha, beta);
+    }
+
+    numNodes++;
+    prevLine->len = 0;
+
     Move bestEntryMove = 0;
 
-    TranspositionEntry* entry = tTable->GetEntry(board.getHash());
-    Score staticEval = Eval<FAST>(board);
+    TranspositionEntry *entry = tTable->GetEntry(board.getHash());
+    Score staticEval = 0;
 
     if (entry)
     {
-        ttHits++;
         staticEval = ttToMate(entry->score, ply);
-        if (entry->depth >= depth)
+
+        ttHits++;
+        if ((entry->getNodeBound() == NodeBound::Exact ||
+             (entry->getNodeBound() == NodeBound::Upper && staticEval <= alpha) ||
+             (entry->getNodeBound() == NodeBound::Lower && staticEval >= beta)))
         {
-            if ((entry->getNodeBound() == NodeBound::Exact ||
-                 (entry->getNodeBound() == NodeBound::Upper && staticEval <= alpha) ||
-                 (entry->getNodeBound() == NodeBound::Lower && staticEval >= beta)))
+            if constexpr (!isPVNode)
             {
-                if constexpr (!isPVNode)
+                if (entry->depth >= depth)
                 {
                     entry->setAge(tTable->GetAge()); // reset the age for this node
                     return staticEval;
                 }
             }
-            else if (!isPVNode)
-            {
-                if (entry->getNodeBound() == NodeBound::Lower)
-                    alpha = std::max(alpha, staticEval);
-                else if (entry->getNodeBound() == NodeBound::Upper)
-                    beta = std::min(beta, staticEval);
-            }
+        }
+        else if constexpr (!isPVNode)
+        {
+            if (entry->getNodeBound() == NodeBound::Lower)
+                alpha = std::max(alpha, staticEval);
+            else if (entry->getNodeBound() == NodeBound::Upper)
+                beta = std::min(beta, staticEval);
         }
 
         bestEntryMove = entry->move;
     }
-    else if (!isPVNode && depth > IIR_DEPTH)
+    else
     {
+        staticEval = Eval<FULL>(board);
+        if constexpr (!isPVNode)
+        {
 
-        // Internal Iterative Reduction if no hashmove found (reduce depth by one)
-        depth--;
-    }
-
-    if (depth == 0)
-    {
-        Score q = qsearch(board, ply, alpha, beta);
-        return q;
+            // Internal Iterative Reduction if no hashmove found (reduce depth by one)
+            depth -= depth > IIR_DEPTH;
+        }
     }
 
     MoveList moves;
@@ -381,8 +386,6 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
     const int lmpThreshold = 3 + 2 * depth * depth;
     for (int i = 0; sorter.size != 0; i++)
     {
-        PVLine line;
-
         Move move = sorter.Next();
 
         if (!isPVNode && !board.getNumChecks() && move.isType<QUIET>())
@@ -392,6 +395,8 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
         }
         int extension = 0;
         bool checkMove = board.isCheckMove(move);
+
+        PVLine line;
 
         if (checkMove)
             extension = 1;
@@ -453,7 +458,8 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
 
             if (move.isType<QUIET>())
             {
-                counterMove[board.getState()->move.from()][board.getState()->move.to()] = move;
+                if (board.getState()->move.getMove() != 0) // don't add for null moves
+                    counterMove[board.getState()->move.from()][board.getState()->move.to()] = move;
 
                 addKillerMove(board.getPly(), move);
                 addHistoryBonus(board.whiteToMove, move, depth); // add move history bonus
@@ -530,7 +536,7 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
     return bestS;
 }
 
-Score iterativeDeepening(Board& board, unsigned int depth, unsigned int nodes, unsigned int movetime)
+Score iterativeDeepening(Board &board, unsigned int depth, unsigned int nodes, unsigned int movetime)
 {
     startTime = getTime();
 
@@ -619,7 +625,7 @@ Score iterativeDeepening(Board& board, unsigned int depth, unsigned int nodes, u
     return bestScore;
 }
 
-Move startSearch(Board& board, unsigned int depth, unsigned int nodes, unsigned int movetime,
+Move startSearch(Board &board, unsigned int depth, unsigned int nodes, unsigned int movetime,
                  unsigned int remaining_time)
 {
     isDone = false;

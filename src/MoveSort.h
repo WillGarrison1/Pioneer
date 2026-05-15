@@ -9,28 +9,28 @@
 
 #include <algorithm>
 
-#define CAPTURE_BONUS 400000
-#define PROMOTION_BONUS 500000
+#define CAPTURE_BONUS 4000
+#define PROMOTION_BONUS 5000
 
 #define MVV_LVA_VICTIM_MULTI 4
 #define MVV_LVA_ATTACKER_MULTI_GOOD 5
 #define MVV_LVA_ATTACKER_MULTI_BAD 1
 
-#define DEFENDED_BONUS 100
-#define ATTACKED_PENALTY -100
+#define DEFENDED_BONUS 5
+#define ATTACKED_PENALTY -10
 
-#define PV_BONUS 1000000
-#define KILLER_MOVE_BONUS 300000
-#define COUNTERMOVE_BONUS 200000
-#define MAX_HISTORY 20000
-#define MAX_CAPTURE_HISTORY 30000
+#define PV_BONUS 10000
+#define KILLER_MOVE_BONUS 3000
+#define COUNTERMOVE_BONUS 2000
+#define MAX_HISTORY 200
+#define MAX_CAPTURE_HISTORY 300
 
 #define CONTINUATION_HISTORY_SIZE 3
 
 struct MoveVal
 {
     Move m;
-    int score;
+    int16_t score;
 };
 
 enum SortType
@@ -39,15 +39,15 @@ enum SortType
     QUIESCENCE
 };
 
-MoveVal ScoreMove(const Board& board, Move m);
-MoveVal ScoreMoveQ(const Board& board, Move m);
+MoveVal ScoreMove(const Board &board, Move m);
+MoveVal ScoreMoveQ(const Board &board, Move m);
 
 struct MoveSorter
 {
     MoveVal moveVals[256];
     unsigned int size;
 
-    MoveSorter(const Board& board, MoveList* mlist, Move best) : size(mlist->GetSize())
+    MoveSorter(const Board &board, MoveList *mlist, Move best) : size(mlist->GetSize())
     {
         for (unsigned int i = 0; i < size; i++)
         {
@@ -103,10 +103,10 @@ inline void addKillerMove(unsigned char ply, Move m)
     killerMoves[ply][0] = m;
 }
 
-inline void updateContinuationHistory(Board& board, Move m, int depth, bool negate)
+inline void updateContinuationHistory(Board &board, Move m, int depth, bool negate)
 {
     int negative = negate ? -1 : 1;
-    const BoardState* prevState = board.getState();
+    const BoardState *prevState = board.getState();
     PieceType moved = getType(board.getSQ(m.from()));
     int clampedBonus = std::clamp(depth * depth, -MAX_HISTORY, MAX_HISTORY) * negative;
     for (int i = 0; i < CONTINUATION_HISTORY_SIZE; i++)
@@ -152,7 +152,7 @@ inline void addCapturePenalty(PieceType victimType, Move m, int depth)
         penalty + captureHistory[m.from()][m.to()][victimType - 1] * std::abs(penalty) / MAX_CAPTURE_HISTORY;
 }
 
-inline Score Mvv_Lva_Score(const Board& board, Move m)
+inline Score Mvv_Lva_Score(const Board &board, Move m)
 {
     PieceType victimType = getType(board.getSQ(m.to()));
     PieceType pieceType = getType(board.getSQ(m.from()));
