@@ -228,7 +228,7 @@ Score qsearch(Board& board, int ply, Score alpha, Score beta)
 }
 
 template <NodeType node>
-Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* prevLine)
+Score search(Board &board, int depth, int ply, Score alpha, Score beta, PVLine *prevLine, const bool nullMoveAllowed = true)
 {
     if (isDone)
         return 0;
@@ -340,18 +340,26 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
 
     // null move pruning
 
-    int numEnemyPieces = popCount(board.getBB(~board.sideToMove) & ~board.getBB(PAWN));
-    if (!isPVNode && numEnemyPieces > 0 && board.getNumChecks() == 0 && depth >= NULL_DEPTH && !isLoss(beta))
+    int numEnemyPieces = popCount(board.getBB(ALL_PIECES, ~board.sideToMove) & ~board.getBB(PAWN));
+    if (!isPVNode && numEnemyPieces > 0 && board.getNumChecks() == 0 && depth >= NULL_DEPTH && !isLoss(beta) && nullMoveAllowed)
     {
         PVLine line;
 
+        int newDepth = depth * 2 / 3 - 1;
+
         board.makeNullMove(&state);
-        tTable->Prefetch(board.getHash());
-        Score nullScore = -search<CUTNode>(board, depth * 2 / 3 - 1, ply + 1, -beta, -beta + 1, &line);
+        Score nullScore = -search<CUTNode>(board, newDepth, ply + 1, -beta, -beta + 1, &line);
         board.undoNullMove();
         if (nullScore >= beta)
         {
-            return nullScore;
+            // Verification search
+            Score score = search<CUTNode>(board, newDepth, ply + 1, beta - 1, beta, &line, false);
+            if (score >= beta)
+                return nullScore;
+            else if (bestEntryMove == 0)
+            {
+                bestEntryMove = line.moves[0];
+            }
         }
     }
 
