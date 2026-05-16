@@ -26,17 +26,17 @@ inline __m128i GatherSquares(Bitboard bb)
     }
 
     // Load into 128-bit SIMD register
-    return _mm_loadu_si128((__m128i*)squares);
+    return _mm_loadu_si128((__m128i *)squares);
 }
 
-inline void AddMoves128(MoveList* mList, __m128i to, __m128i from, uint16_t flags, uint32_t count)
+inline void AddMoves128(MoveList *mList, __m128i to, __m128i from, uint16_t flags, uint32_t count)
 {
     __m128i flagsBroadcast = _mm_set1_epi16(flags << 12);
     __m128i fromToMoves = _mm_or_si128(_mm_slli_epi16(to, 6), from);
     __m128i moves = _mm_or_si128(flagsBroadcast, fromToMoves);
 
     assert(mList->GetSize() + count <= 256);
-    _mm_storeu_si128((__m128i*)mList->end, moves);
+    _mm_storeu_si128((__m128i *)mList->end, moves);
     mList->end += count;
 }
 
@@ -49,7 +49,7 @@ struct MovegenMasks
 };
 
 template <MoveType mType>
-inline void BitboardToMoves(const Square from, Bitboard bb, MoveList* list)
+inline void BitboardToMoves(const Square from, Bitboard bb, MoveList *list)
 {
     while (bb)
     {
@@ -60,7 +60,7 @@ inline void BitboardToMoves(const Square from, Bitboard bb, MoveList* list)
 
 // Special pin detection for en passant
 template <Color color>
-Direction isPinned(const Board& board, Square s, Square enPassant)
+Direction isPinned(const Board &board, Square s, Square enPassant)
 {
     const Bitboard kingBB = board.getBB(color, KING);
     const Bitboard blockers = board.getBB(ALL_PIECES) & ~sqrToBB(enPassant);
@@ -100,7 +100,7 @@ Direction isPinned(const Board& board, Square s, Square enPassant)
 
 // Pawn move generation
 template <MoveType mType, Color color>
-void generatePawnMoves(const Board& board, MoveList* list, MovegenMasks* masks)
+void generatePawnMoves(const Board &board, MoveList *list, MovegenMasks *masks)
 {
     PROFILE_FUNC();
 
@@ -127,30 +127,31 @@ void generatePawnMoves(const Board& board, MoveList* list, MovegenMasks* masks)
 
     const Bitboard promotingPawnsMask = whiteToMove ? rankBBs[RANK_8] : rankBBs[RANK_1];
 
+    const Bitboard singlePushesUnpinned = shift(unpinnedPawnsS & ~masks->pinnedD, forward);
+    const Bitboard singlePushesPinned = shift(pinnedPawnsS & ~masks->pinnedD, forward) & masks->pinnedS;
+    Bitboard singlePushes =
+        (singlePushesPinned | singlePushesUnpinned) & empty; // pawns can't move forward if pinned diagonally
+
+    singlePushes &= masks->checkBB;
+
+    Bitboard promotingPawnsForward = singlePushes & promotingPawnsMask;
+    singlePushes ^= promotingPawnsForward;
+
+    while (promotingPawnsForward)
+    {
+        const Square to = popLSB(promotingPawnsForward);
+        const Square from = to - forward;
+
+        list->addMove(Move(from, to, PROMOTION, QUEEN));
+        list->addMove(Move(from, to, PROMOTION, ROOK));
+        list->addMove(Move(from, to, PROMOTION, BISHOP));
+        list->addMove(Move(from, to, PROMOTION, KNIGHT));
+    }
+
     if constexpr (mType == ALL_MOVES)
     {
-        const Bitboard singlePushesUnpinned = shift(unpinnedPawnsS & ~masks->pinnedD, forward);
-        const Bitboard singlePushesPinned = shift(pinnedPawnsS & ~masks->pinnedD, forward) & masks->pinnedS;
-        Bitboard singlePushes =
-            (singlePushesPinned | singlePushesUnpinned) & empty; // pawns can't move forward if pinned diagonally
-
         Bitboard doublePushes =
             shift(singlePushes, forward) & empty & (whiteToMove ? rankBBs[RANK_4] : rankBBs[RANK_5]) & masks->checkBB;
-        singlePushes &= masks->checkBB;
-
-        Bitboard promotingPawnsForward = singlePushes & promotingPawnsMask;
-        singlePushes ^= promotingPawnsForward;
-
-        while (promotingPawnsForward)
-        {
-            const Square to = popLSB(promotingPawnsForward);
-            const Square from = to - forward;
-
-            list->addMove(Move(from, to, PROMOTION, QUEEN));
-            list->addMove(Move(from, to, PROMOTION, ROOK));
-            list->addMove(Move(from, to, PROMOTION, BISHOP));
-            list->addMove(Move(from, to, PROMOTION, KNIGHT));
-        }
 
 #ifdef __SSE2__
         auto doubleTo = GatherSquares(doublePushes);
@@ -263,7 +264,7 @@ void generatePawnMoves(const Board& board, MoveList* list, MovegenMasks* masks)
 
 // Knight move generation
 template <MoveType mType, Color color>
-void generateKnightMoves(const Board& board, MoveList* list, MovegenMasks* masks)
+void generateKnightMoves(const Board &board, MoveList *list, MovegenMasks *masks)
 {
     PROFILE_FUNC();
 
@@ -286,7 +287,7 @@ void generateKnightMoves(const Board& board, MoveList* list, MovegenMasks* masks
 }
 
 template <MoveType mType, Color color>
-void generateBishopMoves(const Board& board, MoveList* list, MovegenMasks* masks)
+void generateBishopMoves(const Board &board, MoveList *list, MovegenMasks *masks)
 {
     PROFILE_FUNC();
 
@@ -329,7 +330,7 @@ void generateBishopMoves(const Board& board, MoveList* list, MovegenMasks* masks
 }
 
 template <MoveType mType, Color color>
-void generateRookMoves(const Board& board, MoveList* list, MovegenMasks* masks)
+void generateRookMoves(const Board &board, MoveList *list, MovegenMasks *masks)
 {
     PROFILE_FUNC();
     const Bitboard blockers = board.getBB(ALL_PIECES);
@@ -371,7 +372,7 @@ void generateRookMoves(const Board& board, MoveList* list, MovegenMasks* masks)
 }
 
 template <MoveType mType, Color color>
-void generateQueenMoves(const Board& board, MoveList* list, MovegenMasks* masks)
+void generateQueenMoves(const Board &board, MoveList *list, MovegenMasks *masks)
 {
     PROFILE_FUNC();
 
@@ -412,7 +413,7 @@ void generateQueenMoves(const Board& board, MoveList* list, MovegenMasks* masks)
 }
 
 template <MoveType mType, Color color>
-void generateKingMoves(const Board& board, MoveList* list)
+void generateKingMoves(const Board &board, MoveList *list)
 {
     PROFILE_FUNC();
     const Square from = lsb(board.getBB(color, KING));
@@ -432,7 +433,7 @@ void generateKingMoves(const Board& board, MoveList* list)
 }
 
 template <Color color>
-void generateCastlingMoves(const Board& board, MoveList* list)
+void generateCastlingMoves(const Board &board, MoveList *list)
 {
     PROFILE_FUNC();
     const Bitboard blockers = board.getBB(ALL_PIECES);
@@ -474,7 +475,7 @@ void generateCastlingMoves(const Board& board, MoveList* list)
 }
 
 template <MoveType type, Color color>
-void generateMoves(Board& board, MoveList* list)
+void generateMoves(Board &board, MoveList *list)
 {
     PROFILE_FUNC();
     assert(board.getBB(color, KING));
@@ -515,8 +516,8 @@ void generateMoves(Board& board, MoveList* list)
     generateKingMoves<type, color>(board, list);
 }
 
-template void generateMoves<ALL_MOVES, WHITE>(Board& board, MoveList* list);
-template void generateMoves<ALL_MOVES, BLACK>(Board& board, MoveList* list);
+template void generateMoves<ALL_MOVES, WHITE>(Board &board, MoveList *list);
+template void generateMoves<ALL_MOVES, BLACK>(Board &board, MoveList *list);
 
-template void generateMoves<CAPTURE, WHITE>(Board& board, MoveList* list);
-template void generateMoves<CAPTURE, BLACK>(Board& board, MoveList* list);
+template void generateMoves<CAPTURE, WHITE>(Board &board, MoveList *list);
+template void generateMoves<CAPTURE, BLACK>(Board &board, MoveList *list);

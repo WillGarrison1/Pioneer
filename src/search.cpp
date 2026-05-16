@@ -26,7 +26,7 @@ constexpr float aspirationMultiplier = 1.5f;
 
 #define NULL_DEPTH 3
 #define IIR_DEPTH 3 // internal iterative reduction depth
-#define FUTILITY_MARGIN(DEPTH) 80 + 120 * DEPTH
+#define FUTILITY_MARGIN(DEPTH) (80 + 120 * (DEPTH))
 #define DELTA 200
 
 unsigned long long numNodes;
@@ -190,12 +190,13 @@ Score qsearch(Board &board, int ply, Score alpha, Score beta)
     {
         Move m = sorter.Next();
 
-        Piece movePiece = board.getSQ(m.to());
-
         // Delta pruning
-        if (!board.getNumChecks())
+        if (!board.getNumChecks() && !m.isType<PROMOTION>())
         {
-            if (pat + pieceScores[getType(movePiece)] < alpha - DELTA)
+            Piece capturedPiece = board.getSQ(m.to());
+            if (capturedPiece == EMPTY) // en-passant
+                capturedPiece = PAWN;
+            if (pat + pieceScores[getType(capturedPiece)] < alpha - DELTA)
                 continue;
         }
 
@@ -208,14 +209,14 @@ Score qsearch(Board &board, int ply, Score alpha, Score beta)
             pat = score;
             bestM = m;
 
+            if (score >= beta)
+            {
+                tTable->SetEntry(board.getHash(), mateToTT(score, ply), 0, NodeBound::Lower, m);
+                numBetaCutoffs++;
+                return score;
+            }
             if (score > alpha)
             {
-                if (score >= beta)
-                {
-                    tTable->SetEntry(board.getHash(), mateToTT(score, ply), 0, NodeBound::Lower, m);
-                    numBetaCutoffs++;
-                    return score;
-                }
                 alpha = score;
             }
         }
@@ -277,25 +278,28 @@ Score search(Board &board, int depth, int ply, Score alpha, Score beta, PVLine *
         staticEval = ttToMate(entry->score, ply);
 
         ttHits++;
-        if ((entry->getNodeBound() == NodeBound::Exact ||
-             (entry->getNodeBound() == NodeBound::Upper && staticEval <= alpha) ||
-             (entry->getNodeBound() == NodeBound::Lower && staticEval >= beta)))
+        if (entry->depth >= depth)
         {
-            if constexpr (!isPVNode)
+            if ((entry->getNodeBound() == NodeBound::Exact ||
+                 (entry->getNodeBound() == NodeBound::Upper && staticEval <= alpha) ||
+                 (entry->getNodeBound() == NodeBound::Lower && staticEval >= beta)))
             {
-                if (entry->depth >= depth)
+                if constexpr (!isPVNode)
                 {
                     entry->setAge(tTable->GetAge()); // reset the age for this node
                     return staticEval;
                 }
             }
-        }
-        else if constexpr (!isPVNode)
-        {
-            if (entry->getNodeBound() == NodeBound::Lower)
-                alpha = std::max(alpha, staticEval);
-            else if (entry->getNodeBound() == NodeBound::Upper)
-                beta = std::min(beta, staticEval);
+            else
+            {
+                if (entry->getNodeBound() == NodeBound::Lower)
+                    alpha = std::max(alpha, staticEval);
+                else if (entry->getNodeBound() == NodeBound::Upper)
+                    beta = std::min(beta, staticEval);
+
+                if (alpha >= beta)
+                    return staticEval;
+            }
         }
 
         bestEntryMove = entry->move;
@@ -316,10 +320,12 @@ Score search(Board &board, int depth, int ply, Score alpha, Score beta, PVLine *
 
     if (moves.GetSize() == 0)
     {
+        Score mateScore = 0;      // stalemate
         if (board.getNumChecks()) // if in check, then checkmate
-            return -MATE + ply;
-        else // else, stalemate
-            return 0;
+            mateScore = -MATE;
+
+        tTable->SetEntry(board.getHash(), mateToTT(mateScore, ply), depth, NodeBound::Exact, 0);
+        return mateScore;
     }
 
     // reverse futility pruning
@@ -428,7 +434,7 @@ Score search(Board &board, int depth, int ply, Score alpha, Score beta, PVLine *
 
             score = -search<CUTNode>(board, std::max(depth - reductions - 1, 0), ply + 1, -alpha - 1, -alpha, &line);
 
-            fullSearch = score > alpha;
+            fullSearch = score > alpha && (reductions != 0 || extension > 0);
             line.len = 0;
         }
 
@@ -615,7 +621,7 @@ Score iterativeDeepening(Board &board, unsigned int depth, unsigned int nodes, u
         std::cout << "info depth " << d << " curmov " << bestMove.toString() << " score cp " << eval << " nodes "
                   << numNodes + numQNodes << " pv " << GetMoveListString(&pv) << "hashfull "
                   << (int)(tTable->GetFull() * 1000) << " time " << getTime() - startTime << " TTHitRate "
-                  << (float)ttHits / (float)numNodes << " BetaCutRate " << (float)numBetaCutoffs / (float)numNodes
+                  << (float)ttHits / (float)numNodes << " BetaCutRate " << (float)numBetaCutoffs / (float)(numNodes + numQNodes)
                   << " PVHitRate " << (float)pvHits / (float)orderingNodes << std::endl;
 
         prevBestMove = bestMove;
