@@ -41,8 +41,7 @@ unsigned long long startTime;
 
 bool isDone;
 
-constexpr auto lmrTable = []
-{
+constexpr auto lmrTable = [] {
     std::array<std::array<int, 256>, MAX_DEPTH> table{};
     for (int d = 0; d < MAX_DEPTH; d++)
     {
@@ -87,7 +86,7 @@ inline Score ttToMate(Score s, unsigned char ply)
     return isWin(s) ? s - ply : (isLoss(s) ? s + ply : s);
 }
 
-void UpdatePV(PVLine *line, Move move, PVLine *prev)
+void UpdatePV(PVLine* line, Move move, PVLine* prev)
 {
     prev->moves[0] = move;
     for (unsigned int i = 0; i < line->len; i++)
@@ -110,7 +109,7 @@ constexpr int LMRReduction(int depth, int moveNum)
     return lmrTable[depth][moveNum];
 }
 
-std::string GetMoveListString(PVLine *l)
+std::string GetMoveListString(PVLine* l)
 {
     std::string moves;
     for (unsigned int i = 0; i < l->len; i++)
@@ -121,7 +120,7 @@ std::string GetMoveListString(PVLine *l)
     return moves;
 }
 
-Score qsearch(Board &board, int ply, Score alpha, Score beta)
+Score qsearch(Board& board, int ply, Score alpha, Score beta)
 {
     PROFILE_FUNC();
     numQNodes++;
@@ -133,7 +132,7 @@ Score qsearch(Board &board, int ply, Score alpha, Score beta)
     if (board.getState()->move50rule == 100)
         return 0; // 50-move draw
 
-    TranspositionEntry *entry = tTable->GetEntry(board.getHash());
+    TranspositionEntry* entry = tTable->GetEntry(board.getHash());
     Move bestEntryMove = 0;
     if (entry)
     {
@@ -221,19 +220,14 @@ Score qsearch(Board &board, int ply, Score alpha, Score beta)
             }
         }
     }
-    if (bestM.getMove() != 0)
-    {
-        NodeBound bound = (pat >= beta)           ? NodeBound::Lower
-                          : (pat > originalAlpha) ? NodeBound::Exact
-                                                  : NodeBound::Upper;
-        tTable->SetEntry(board.getHash(), mateToTT(pat, ply), 0, bound, bestM);
-    }
+    NodeBound bound = (pat >= beta) ? NodeBound::Lower : (pat > originalAlpha) ? NodeBound::Exact : NodeBound::Upper;
+    tTable->SetEntry(board.getHash(), mateToTT(pat, ply), 0, bound, bestM);
 
     return pat;
 }
 
 template <NodeType node>
-Score search(Board &board, int depth, int ply, Score alpha, Score beta, PVLine *prevLine,
+Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* prevLine,
              const bool nullMoveAllowed = true)
 {
     constexpr bool isPVNode = node == PVNode || node == RootNode;
@@ -270,12 +264,13 @@ Score search(Board &board, int depth, int ply, Score alpha, Score beta, PVLine *
 
     Move bestEntryMove = 0;
 
-    TranspositionEntry *entry = tTable->GetEntry(board.getHash());
-    Score staticEval = 0;
+    TranspositionEntry* entry = tTable->GetEntry(board.getHash());
+    Score staticEval = Eval<FULL>(board);
+    Score ttOrStaticScore = staticEval;
 
     if (entry)
     {
-        staticEval = ttToMate(entry->score, ply);
+        ttOrStaticScore = ttToMate(entry->score, ply);
 
         ttHits++;
         if (entry->depth >= depth)
@@ -287,7 +282,7 @@ Score search(Board &board, int depth, int ply, Score alpha, Score beta, PVLine *
                 if constexpr (!isPVNode)
                 {
                     entry->setAge(tTable->GetAge()); // reset the age for this node
-                    return staticEval;
+                    return ttOrStaticScore;
                 }
             }
             else
@@ -298,21 +293,17 @@ Score search(Board &board, int depth, int ply, Score alpha, Score beta, PVLine *
                     beta = std::min(beta, staticEval);
 
                 if (alpha >= beta)
-                    return staticEval;
+                    return ttOrStaticScore;
             }
         }
 
         bestEntryMove = entry->move;
     }
-    else
+    else if constexpr (!isPVNode)
     {
-        staticEval = Eval<FULL>(board);
-        if constexpr (!isPVNode)
-        {
 
-            // Internal Iterative Reduction if no hashmove found (reduce depth by one)
-            depth -= depth > IIR_DEPTH;
-        }
+        // Internal Iterative Reduction if no hashmove found (reduce depth by one)
+        depth -= depth > IIR_DEPTH;
     }
 
     MoveList moves;
@@ -378,7 +369,7 @@ Score search(Board &board, int depth, int ply, Score alpha, Score beta, PVLine *
         }
     }
 
-    if (node == RootNode)
+    if constexpr (isRootNode)
         bestEntryMove = prevBestMove;
 
     MoveSorter sorter(board, &moves, bestEntryMove);
@@ -412,7 +403,7 @@ Score search(Board &board, int depth, int ply, Score alpha, Score beta, PVLine *
         // Futility pruning
         if (!isPVNode && depth < FUTILITY_DEPTH && move.type() == QUIET && !checkMove)
         {
-            Score eval = staticEval + FUTILITY_MARGIN(depth);
+            Score eval = ttOrStaticScore + FUTILITY_MARGIN(depth);
             if (eval <= alpha)
                 continue;
         }
@@ -434,7 +425,7 @@ Score search(Board &board, int depth, int ply, Score alpha, Score beta, PVLine *
 
             score = -search<CUTNode>(board, std::max(depth - reductions - 1, 0), ply + 1, -alpha - 1, -alpha, &line);
 
-            fullSearch = score > alpha && (reductions != 0 || extension > 0);
+            fullSearch = score > alpha && (isPVNode || reductions != 0 || extension > 0);
             line.len = 0;
         }
 
@@ -542,7 +533,7 @@ Score search(Board &board, int depth, int ply, Score alpha, Score beta, PVLine *
     return bestS;
 }
 
-Score iterativeDeepening(Board &board, unsigned int depth, unsigned int nodes, unsigned int movetime)
+Score iterativeDeepening(Board& board, unsigned int depth, unsigned int nodes, unsigned int movetime)
 {
     startTime = getTime();
 
@@ -621,8 +612,9 @@ Score iterativeDeepening(Board &board, unsigned int depth, unsigned int nodes, u
         std::cout << "info depth " << d << " curmov " << bestMove.toString() << " score cp " << eval << " nodes "
                   << numNodes + numQNodes << " pv " << GetMoveListString(&pv) << "hashfull "
                   << (int)(tTable->GetFull() * 1000) << " time " << getTime() - startTime << " TTHitRate "
-                  << (float)ttHits / (float)numNodes << " BetaCutRate " << (float)numBetaCutoffs / (float)(numNodes + numQNodes)
-                  << " PVHitRate " << (float)pvHits / (float)orderingNodes << std::endl;
+                  << (float)ttHits / (float)numNodes << " BetaCutRate "
+                  << (float)numBetaCutoffs / (float)(numNodes + numQNodes) << " PVHitRate "
+                  << (float)pvHits / (float)orderingNodes << std::endl;
 
         prevBestMove = bestMove;
         prevBestScore = bestScore;
@@ -631,17 +623,18 @@ Score iterativeDeepening(Board &board, unsigned int depth, unsigned int nodes, u
     return bestScore;
 }
 
-Move startSearch(Board &board, unsigned int depth, unsigned int nodes, unsigned int movetime,
+Move startSearch(Board& board, unsigned int depth, unsigned int nodes, unsigned int movetime,
                  unsigned int remaining_time)
 {
     isDone = false;
+
+    MoveList mlist;
+    board.generateMoves<ALL_MOVES>(&mlist);
 
     if (remaining_time > 0)
     {
         float maxTime = (float)remaining_time / 25.0f;
 
-        MoveList mlist;
-        board.generateMoves<ALL_MOVES>(&mlist);
         if (mlist.GetSize() > 30)
             maxTime *= 1.5;
         else if (mlist.GetSize() < 10)
@@ -656,6 +649,11 @@ Move startSearch(Board &board, unsigned int depth, unsigned int nodes, unsigned 
 
     tTable->IncrementAge();
     Score eval = iterativeDeepening(board, depth, nodes, movetime);
+
+    if (bestMove.getMove() == 0 && mlist.GetSize() > 0)
+    {
+        bestMove = mlist[0];
+    }
 
     std::cout << "bestmove " << bestMove.toString() << " score cp " << eval << std::endl;
 
