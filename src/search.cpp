@@ -273,19 +273,17 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
         entry->setAge(tTable->GetAge()); // reset the age for this node
 
         ttHits++;
-        if (entry->depth >= depth)
+        if constexpr (!isPVNode)
         {
-            if ((entry->getNodeBound() == NodeBound::Exact ||
-                 (entry->getNodeBound() == NodeBound::Upper && ttOrStaticScore <= alpha) ||
-                 (entry->getNodeBound() == NodeBound::Lower && ttOrStaticScore >= beta)))
+            if (entry->depth >= depth)
             {
-                if constexpr (!isPVNode)
+                if ((entry->getNodeBound() == NodeBound::Exact ||
+                     (entry->getNodeBound() == NodeBound::Upper && ttOrStaticScore <= alpha) ||
+                     (entry->getNodeBound() == NodeBound::Lower && ttOrStaticScore >= beta)))
                 {
                     return ttOrStaticScore;
                 }
-            }
-            else
-            {
+
                 if (entry->getNodeBound() == NodeBound::Lower)
                     alpha = std::max(alpha, ttOrStaticScore);
                 else if (entry->getNodeBound() == NodeBound::Upper)
