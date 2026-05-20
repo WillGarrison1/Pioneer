@@ -36,7 +36,7 @@ BoardState::BoardState()
     prev = nullptr;
 }
 
-BoardState::BoardState(BoardState *prev)
+BoardState::BoardState(BoardState* prev)
 {
     this->attacks[0] = 0ULL;
     this->attacks[1] = 0ULL;
@@ -109,7 +109,7 @@ void Board::movePiece(Square from, Square to)
     board[to] = piece;
 }
 
-void Board::addPieceZobrist(Piece piece, Square square, Key &key)
+void Board::addPieceZobrist(Piece piece, Square square, Key& key)
 {
     const PieceType pieceType = getType(piece);
     const Color color = getColor(piece);
@@ -122,7 +122,7 @@ void Board::addPieceZobrist(Piece piece, Square square, Key &key)
     board[square] = piece;
 }
 
-void Board::removePieceZobrist(Square square, Key &key)
+void Board::removePieceZobrist(Square square, Key& key)
 {
     const Piece piece = board[square];
     const PieceType pieceType = getType(piece);
@@ -136,7 +136,7 @@ void Board::removePieceZobrist(Square square, Key &key)
     board[square] = EMPTY;
 }
 
-void Board::movePieceZobrist(Square from, Square to, Key &key)
+void Board::movePieceZobrist(Square from, Square to, Key& key)
 {
     const Piece piece = board[from];
     const PieceType pieceType = getType(piece);
@@ -152,7 +152,7 @@ void Board::movePieceZobrist(Square from, Square to, Key &key)
     board[to] = piece;
 }
 
-void Board::makeMove(Move move, BoardState *newState)
+void Board::makeMove(Move move, BoardState* newState)
 {
     PROFILE_FUNC();
 
@@ -416,13 +416,14 @@ void Board::undoMove()
     ply--;
 }
 
-void Board::makeNullMove(BoardState *newState)
+void Board::makeNullMove(BoardState* newState)
 {
     *newState = *state;
     newState->prev = state;
     state = newState;
 
     state->move = 0;
+    state->moved = EMPTY;
     state->checkers = 0;
     this->ply++;
 
@@ -451,12 +452,19 @@ unsigned int Board::getRepetition() const
 {
     Key zobrist = state->zobristHash;
 
-    BoardState *currState = state->prev;
-    while (currState && currState->prev)
+    // Only same-side-to-move positions can repeat. state->prev is opposite side,
+    // so start two plies back and step two plies at a time.
+    if (!state->prev || !state->prev->prev)
+        return 1;
+
+    BoardState* currState = state->prev->prev;
+    while (currState)
     {
         if (currState->zobristHash == zobrist)
             return currState->repetition + 1;
         if (currState->move50rule == 0)
+            break;
+        if (!currState->prev || !currState->prev->prev)
             break;
         currState = currState->prev->prev;
     }
@@ -511,7 +519,7 @@ void Board::clear()
     }
 }
 
-void Board::setFen(const std::string &fen, BoardState *newState)
+void Board::setFen(const std::string& fen, BoardState* newState)
 {
     clear();
 
@@ -719,7 +727,7 @@ void Board::computeAttackedBBs()
     }
 }
 
-void Board::computePins(Bitboard &pinnedS, Bitboard &pinnedD)
+void Board::computePins(Bitboard& pinnedS, Bitboard& pinnedD)
 {
     pinnedS = pinnedD = 0ULL;
 

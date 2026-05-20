@@ -270,6 +270,7 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
     if (entry)
     {
         ttOrStaticScore = ttToMate(entry->score, ply);
+        entry->setAge(tTable->GetAge()); // reset the age for this node
 
         ttHits++;
         if (entry->depth >= depth)
@@ -280,7 +281,6 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
             {
                 if constexpr (!isPVNode)
                 {
-                    entry->setAge(tTable->GetAge()); // reset the age for this node
                     return ttOrStaticScore;
                 }
             }
