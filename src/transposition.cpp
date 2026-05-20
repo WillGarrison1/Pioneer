@@ -44,17 +44,19 @@ TranspositionEntry* TranspositionTable::GetEntry(Key key)
     TranspositionBucket* bucket = &this->buckets[index];
     uint32_t intKey = key >> 32ULL;
 
-    TranspositionEntry* result = nullptr;
-
     for (TranspositionEntry* entry = bucket->entries; entry < bucket->entries + BUCKET_SIZE; entry++)
+    {
         if (entry->key == intKey)
-            result = entry;
-    return result;
+        {
+            return entry;
+        }
+    }
+    
+    return nullptr;
 }
 
 void TranspositionTable::SetEntry(Key zobrist, Score score, int depth, NodeBound bound, Move bestMove)
 {
-    assert(bestMove.getMove() != 0);
     unsigned long long index = zobrist & (this->numBuckets - 1); // much faster than modulo
     TranspositionBucket* bucket = &this->buckets[index];
 
