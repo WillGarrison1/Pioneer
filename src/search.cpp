@@ -265,7 +265,7 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
     Move bestEntryMove = 0;
 
     TranspositionEntry* entry = tTable->GetEntry(board.getHash());
-    Score ttOrStaticScore = alpha;
+    Score ttOrStaticScore = 0; // set below: from TT score if available, otherwise from staticEval
 
     if (entry)
     {
@@ -306,6 +306,8 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
     }
 
     Score staticEval = Eval<FULL>(board);
+    if (!entry)
+        ttOrStaticScore = staticEval;
 
     MoveList moves;
     board.generateMoves<ALL_MOVES>(&moves);
@@ -314,7 +316,7 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
     {
         Score mateScore = 0;      // stalemate
         if (board.getNumChecks()) // if in check, then checkmate
-            mateScore = -MATE;
+            mateScore = -MATE + ply;
 
         tTable->SetEntry(board.getHash(), mateToTT(mateScore, ply), depth, NodeBound::Exact, 0);
         return mateScore;
@@ -338,7 +340,9 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
 
         if (staticEval + margin <= alpha)
         {
-            return qsearch(board, ply, alpha, beta);
+            Score razorScore = qsearch(board, ply, alpha, beta);
+            if (razorScore <= alpha)
+                return razorScore;
         }
     }
 
@@ -346,8 +350,8 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
 
     // null move pruning
 
-    int numEnemyPieces = popCount(board.getBB(ALL_PIECES, ~board.sideToMove) & ~board.getBB(PAWN));
-    if (!isPVNode && numEnemyPieces > 0 && board.getNumChecks() == 0 && depth >= NULL_DEPTH && !isLoss(beta) &&
+    int numOurPieces = popCount(board.getBB(ALL_PIECES, board.sideToMove) & ~board.getBB(PAWN));
+    if (!isPVNode && numOurPieces > 0 && board.getNumChecks() == 0 && depth >= NULL_DEPTH && !isLoss(beta) &&
         nullMoveAllowed && staticEval >= beta)
     {
         PVLine line;
@@ -363,7 +367,7 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
             Score score = search<CUTNode>(board, newDepth, ply + 1, beta - 1, beta, &line, false);
             if (score >= beta)
                 return nullScore;
-            else if (bestEntryMove == 0)
+            else if (bestEntryMove == 0 && line.len > 0)
             {
                 bestEntryMove = line.moves[0];
             }
@@ -371,7 +375,10 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
     }
 
     if constexpr (isRootNode)
-        bestEntryMove = prevBestMove;
+    {
+        if (prevBestMove.getMove() != 0)
+            bestEntryMove = prevBestMove;
+    }
 
     MoveSorter sorter(board, &moves, bestEntryMove);
 
@@ -402,7 +409,7 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
         //     extension = 1;
 
         // Futility pruning
-        if (!isPVNode && depth < FUTILITY_DEPTH && move.type() == QUIET && !checkMove)
+        if (!isPVNode && !board.getNumChecks() && depth < FUTILITY_DEPTH && move.type() == QUIET && !checkMove)
         {
             Score eval = ttOrStaticScore + FUTILITY_MARGIN(depth);
             if (eval <= alpha)
@@ -537,6 +544,7 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, PVLine* 
 Score iterativeDeepening(Board& board, unsigned int depth, unsigned int nodes, unsigned int movetime)
 {
     startTime = getTime();
+    memset(killerMoves, 0, sizeof(killerMoves));
 
     PVLine pv;
     pv.len = 0;
