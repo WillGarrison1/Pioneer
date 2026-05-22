@@ -7,12 +7,14 @@
 #include "evaluate.h"
 #include "move.h"
 #include "movegen.h"
+#include "nnue/nnue.h"
 #include "perft.h"
 #include "search.h"
 #include "square.h"
 #include "time.h"
 #include "transposition.h"
 #include <cstring>
+#include "platform.h"
 
 Engine::Engine()
 {
@@ -24,6 +26,15 @@ Engine::Engine()
 
     std::memset(moveHistory, 0, sizeof(moveHistory));
     std::memset(killerMoves, 0, sizeof(killerMoves));
+
+    std::string exeDir;
+    GetExecutablePath(exeDir);
+    exeDir = exeDir.substr(0, exeDir.find_last_of("/\\"));
+    bool nnueLoaded = nnue->Load(exeDir + "/nnue.bin");
+    if (!nnueLoaded)
+    {
+        std::cerr << "Failed to load NNUE network." << std::endl;
+    }
 
     board = new Board;
     board->setFen(START_FEN, &states[0]);

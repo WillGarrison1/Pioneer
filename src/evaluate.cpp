@@ -5,6 +5,7 @@
 #include "board.h"
 #include "color.h"
 #include "profile.h"
+#include "nnue/nnue.h"
 
 #define DEFENDED_BONUS 10    // bonus for defended piece
 #define ATTACKED_PENALTY -15 // penalty for attacked piece
@@ -218,6 +219,7 @@ Score Evaluate(Board& board)
 {
     PROFILE_FUNC();
 
+#ifdef USE_HAND_EVAL
     Score score = EvalPiece<PAWN>(board) + EvalPiece<KNIGHT>(board) + EvalPiece<BISHOP>(board) +
                   EvalPiece<ROOK>(board) + EvalPiece<QUEEN>(board) + EvalPiece<KING>(board);
 
@@ -225,8 +227,10 @@ Score Evaluate(Board& board)
     score += (popCount(board.getAttacked(WHITE)) - popCount(board.getAttacked(BLACK))) * REACH_MULTIPLIER;
 
     score += board.getPawnMaterial() + board.getNonPawnMaterial(); // score material
-
-    return score * (board.whiteToMove ? 1 : -1);
+#else
+    Score score = nnue->Evaluate(board);
+#endif
+    return score;
 }
 
 template <>

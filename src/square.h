@@ -52,6 +52,11 @@ constexpr Square operator-(const Square sq, const int offset)
     return static_cast<Square>(static_cast<int>(sq) - offset);
 }
 
+constexpr Square operator^(const Square sq, const int offset)
+{
+    return static_cast<Square>(static_cast<int>(sq) ^ offset);
+}
+
 constexpr Square operator+=(Square &sq, const int offset)
 {
     sq = sq + offset;
@@ -61,6 +66,12 @@ constexpr Square operator+=(Square &sq, const int offset)
 constexpr Square operator-=(Square &sq, const int offset)
 {
     sq = sq - offset;
+    return sq;
+}
+
+constexpr Square operator^=(Square &sq, const int offset)
+{
+    sq = sq ^ offset;
     return sq;
 }
 

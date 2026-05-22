@@ -9,6 +9,7 @@
 #include "direction.h"
 #include "evaluate.h"
 #include "movegen.h"
+#include "nnue/nnue.h"
 #include "piece.h"
 #include "profile.h"
 #include "square.h"
@@ -81,6 +82,20 @@ void Board::addPiece(Piece piece, Square square)
     setBit(colorBB[color], square);
 
     board[square] = piece;
+
+    if (piece != makePiece(KING, WHITE))
+    {
+        Square whiteKingSquare = lsb(pieceBB[KING] & colorBB[WHITE]);
+        int whiteIndex = GetIndex(square, whiteKingSquare, static_cast<PieceType>(pieceType - 1), true, color == BLACK);
+        nnue->Add(whiteAcc, whiteIndex);
+    }
+    if (piece != makePiece(KING, BLACK))
+    {
+        Square blackKingSquare = lsb(pieceBB[KING] & colorBB[BLACK]);
+        int blackIndex =
+            GetIndex(square, blackKingSquare, static_cast<PieceType>(pieceType - 1), false, color == BLACK);
+        nnue->Add(blackAcc, blackIndex);
+    }
 }
 
 void Board::removePiece(Square square)
@@ -93,6 +108,19 @@ void Board::removePiece(Square square)
     clearBit(colorBB[color], square);
 
     board[square] = EMPTY;
+    if (piece != makePiece(KING, WHITE))
+    {
+        Square whiteKingSquare = lsb(pieceBB[KING] & colorBB[WHITE]);
+        int whiteIndex = GetIndex(square, whiteKingSquare, static_cast<PieceType>(pieceType - 1), true, color == BLACK);
+        nnue->Remove(whiteAcc, whiteIndex);
+    }
+    if (piece != makePiece(KING, BLACK))
+    {
+        Square blackKingSquare = lsb(pieceBB[KING] & colorBB[BLACK]);
+        int blackIndex =
+            GetIndex(square, blackKingSquare, static_cast<PieceType>(pieceType - 1), false, color == BLACK);
+        nnue->Remove(blackAcc, blackIndex);
+    }
 }
 
 void Board::movePiece(Square from, Square to)
@@ -107,49 +135,43 @@ void Board::movePiece(Square from, Square to)
 
     board[from] = EMPTY;
     board[to] = piece;
+
+    if (piece != makePiece(KING, WHITE))
+    {
+        Square whiteKingSquare = lsb(pieceBB[KING] & colorBB[WHITE]);
+        int whiteIndexFrom =
+            GetIndex(from, whiteKingSquare, static_cast<PieceType>(pieceType - 1), true, color == BLACK);
+        int whiteIndexTo = GetIndex(to, whiteKingSquare, static_cast<PieceType>(pieceType - 1), true, color == BLACK);
+        nnue->Update(whiteAcc, whiteIndexFrom, whiteIndexTo);
+    }
+    if (piece != makePiece(KING, BLACK))
+    {
+        Square blackKingSquare = lsb(pieceBB[KING] & colorBB[BLACK]);
+        int blackIndexFrom =
+            GetIndex(from, blackKingSquare, static_cast<PieceType>(pieceType - 1), false, color == BLACK);
+        int blackIndexTo = GetIndex(to, blackKingSquare, static_cast<PieceType>(pieceType - 1), false, color == BLACK);
+        nnue->Update(blackAcc, blackIndexFrom, blackIndexTo);
+    }
 }
 
 void Board::addPieceZobrist(Piece piece, Square square, Key& key)
 {
-    const PieceType pieceType = getType(piece);
-    const Color color = getColor(piece);
-
     key ^= boardHashes[square][piece];
-
-    setBit(pieceBB[pieceType], square);
-    setBit(colorBB[color], square);
-
-    board[square] = piece;
+    addPiece(piece, square);
 }
 
 void Board::removePieceZobrist(Square square, Key& key)
 {
     const Piece piece = board[square];
-    const PieceType pieceType = getType(piece);
-    const Color color = getColor(piece);
-
     key ^= boardHashes[square][piece];
-
-    clearBit(pieceBB[pieceType], square);
-    clearBit(colorBB[color], square);
-
-    board[square] = EMPTY;
+    removePiece(square);
 }
 
 void Board::movePieceZobrist(Square from, Square to, Key& key)
 {
     const Piece piece = board[from];
-    const PieceType pieceType = getType(piece);
-    const Color color = getColor(piece);
-    const Bitboard moveBB = sqrToBB(from) | sqrToBB(to);
-
-    colorBB[color] ^= moveBB;
-    pieceBB[pieceType] ^= moveBB;
-
     key ^= boardHashes[to][piece] ^ boardHashes[from][piece];
-
-    board[from] = EMPTY;
-    board[to] = piece;
+    movePiece(from, to);
 }
 
 void Board::makeMove(Move move, BoardState* newState)
@@ -517,6 +539,9 @@ void Board::clear()
     {
         board[i] = EMPTY;
     }
+
+    nnue->Reset(whiteAcc);
+    nnue->Reset(blackAcc);
 }
 
 void Board::setFen(const std::string& fen, BoardState* newState)
@@ -543,10 +568,15 @@ void Board::setFen(const std::string& fen, BoardState* newState)
         else
         {
             Piece piece = stringToPiece(std::string(1, c));
-            board[s] = piece;
-            setBit(pieceBB[getType(piece)], s);
-            setBit(colorBB[getColor(piece)], s);
             state->zobristHash ^= boardHashes[s][piece];
+
+            const PieceType pieceType = getType(piece);
+            const Color color = getColor(piece);
+
+            setBit(pieceBB[pieceType], s);
+            setBit(colorBB[color], s);
+
+            board[s] = piece;
 
             switch (getType(piece))
             {
@@ -559,6 +589,22 @@ void Board::setFen(const std::string& fen, BoardState* newState)
             }
 
             s++;
+        }
+    }
+
+    Square whiteKingSquare = lsb(pieceBB[KING] & colorBB[WHITE]);
+    Square blackKingSquare = lsb(pieceBB[KING] & colorBB[BLACK]);
+    for (PieceType i = PAWN; i < ALL_PIECES; i = static_cast<PieceType>(i + 1))
+    {
+        Bitboard bb = pieceBB[i];
+        while (bb)
+        {
+            Square sqr = popLSB(bb);
+            Color color = getColor(board[sqr]);
+            int whiteIndex = GetIndex(sqr, whiteKingSquare, static_cast<PieceType>(i - 1), true, color == BLACK);
+            int blackIndex = GetIndex(sqr, blackKingSquare, static_cast<PieceType>(i - 1), false, color == BLACK);
+            nnue->Add(whiteAcc, whiteIndex);
+            nnue->Add(blackAcc, blackIndex);
         }
     }
 

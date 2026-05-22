@@ -17,3 +17,9 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
 endif()
 
 add_executable(PioneerV4 ${SOURCES})
+
+add_custom_command(TARGET PioneerV4 POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_SOURCE_DIR}/src/nnue/bin/nnue.bin
+        $<TARGET_FILE_DIR:PioneerV4>/nnue.bin
+)

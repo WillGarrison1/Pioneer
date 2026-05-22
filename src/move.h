@@ -34,6 +34,7 @@ class Move
     {
     }
     Move(const std::string str);
+    ~Move() = default;
 
     constexpr Move& operator=(const Move& other)
     {

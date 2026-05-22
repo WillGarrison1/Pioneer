@@ -55,7 +55,7 @@ constexpr auto lmrTable = [] {
 
 struct PVLine
 {
-    unsigned int len;
+    uint8_t len;
     Move moves[MAX_DEPTH];
 
     PVLine() : len(0)
@@ -89,6 +89,7 @@ inline Score ttToMate(Score s, unsigned char ply)
 void UpdatePV(PVLine* line, Move move, PVLine* prev)
 {
     prev->moves[0] = move;
+    line->len = std::min(line->len, static_cast<uint8_t>(MAX_DEPTH - 2));
     for (unsigned int i = 0; i < line->len; i++)
     {
         prev->moves[i + 1] = line->moves[i];

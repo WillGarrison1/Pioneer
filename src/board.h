@@ -9,6 +9,7 @@
 #include "types.h"
 
 #include "movegen.h"
+#include "nnue/layer.h"
 
 #define MAX_PLY 512
 
@@ -192,6 +193,11 @@ class Board
         return ply;
     }
 
+    inline const Accumulator& getAccumulator(Color color) const
+    {
+        return (color == WHITE) ? whiteAcc : blackAcc;
+    }
+
     bool whiteToMove; // True if white is to move
     Color sideToMove; // Side to move
 
@@ -204,5 +210,7 @@ class Board
     Piece board[64]; // Board representation
 
     BoardState* state; // Current board state
+
+    Accumulator whiteAcc, blackAcc;
 };
 #endif
