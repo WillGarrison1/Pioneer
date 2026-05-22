@@ -171,10 +171,6 @@ void Board::movePieceState(Square from, Square to, BoardState* current)
         int whiteIndexTo = GetIndex(to, whiteKingSquare, static_cast<PieceType>(pieceType - 1), true, color == BLACK);
         nnue->Update(current->whiteAcc, whiteIndexFrom, whiteIndexTo);
     }
-    else
-    {
-        ResetWhiteAccumulator();
-    }
     if (piece != makePiece(KING, BLACK))
     {
         Square blackKingSquare = lsb(pieceBB[KING] & colorBB[BLACK]);
@@ -182,10 +178,6 @@ void Board::movePieceState(Square from, Square to, BoardState* current)
             GetIndex(from, blackKingSquare, static_cast<PieceType>(pieceType - 1), false, color == BLACK);
         int blackIndexTo = GetIndex(to, blackKingSquare, static_cast<PieceType>(pieceType - 1), false, color == BLACK);
         nnue->Update(current->blackAcc, blackIndexFrom, blackIndexTo);
-    }
-    else
-    {
-        ResetBlackAccumulator();
     }
 }
 
@@ -209,11 +201,16 @@ void Board::makeMove(Move move, BoardState* newState)
     newState->move = move;
     newState->captured = board[move.to()];
     newState->moved = board[move.from()];
+    newState->whiteAcc = state->whiteAcc;
+    newState->blackAcc = state->blackAcc;
 
     if (state->enPassantSquare != SQ_NONE) // if enPassant square from last move, remove it from zobrist
         newState->zobristHash ^= enPassantHash[getFile(getEnPassantSqr())];
 
     newState->zobristHash ^= castleRightsHash[newState->castling]; // remove old castling rights hash
+
+    const Square kingWSquareStart = lsb(getBB(WHITE, KING));
+    const Square kingBSquareStart = lsb(getBB(BLACK, KING));
 
     // Update board
     if (move.type() == CASTLE)
@@ -352,6 +349,17 @@ void Board::makeMove(Move move, BoardState* newState)
     // Sync all-piece bb
     pieceBB[ALL_PIECES] = colorBB[WHITE] | colorBB[BLACK];
     pieceBB[EMPTY] = ~pieceBB[ALL_PIECES];
+
+    const Square kingWSquareEnd = lsb(getBB(WHITE, KING));
+    const Square kingBSquareEnd = lsb(getBB(BLACK, KING));
+    if (kingWSquareStart != kingWSquareEnd)
+    {
+        ResetWhiteAccumulator();
+    }
+    if (kingBSquareStart != kingBSquareEnd)
+    {
+        ResetBlackAccumulator();
+    }
 
     // Update state
     ply++;
