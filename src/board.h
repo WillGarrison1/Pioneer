@@ -20,6 +20,8 @@ struct BoardState
 {
     BoardState* prev;
 
+    Accumulator whiteAcc, blackAcc;
+
     Bitboard attacks[2]; // the attacks a side has (white = 0 black = 1)
     Bitboard checkers;
     Key zobristHash;
@@ -50,9 +52,9 @@ class Board
     void removePiece(const Square square);
     void movePiece(const Square from, const Square to);
 
-    void addPieceZobrist(const Piece piece, const Square to, Key& key);
-    void removePieceZobrist(const Square from, Key& key);
-    void movePieceZobrist(const Square from, const Square to, Key& key); // moves the piece and updates the zobrist hash
+    void addPieceState(const Piece piece, const Square to, BoardState* state);
+    void removePieceState(const Square from, BoardState* state);
+    void movePieceState(const Square from, const Square to, BoardState* state); // moves the piece and updates the zobrist hash
 
     void makeMove(const Move move, BoardState* newState);
     void undoMove();
@@ -80,6 +82,10 @@ class Board
     void print() const;
 
     void setFen(const std::string& fen, BoardState* newState);
+
+    void ResetWhiteAccumulator();
+    void ResetBlackAccumulator();
+
     std::string getFen() const;
 
     // Clears bitboards and board
@@ -195,7 +201,7 @@ class Board
 
     inline const Accumulator& getAccumulator(Color color) const
     {
-        return (color == WHITE) ? whiteAcc : blackAcc;
+        return (color == WHITE) ? state->whiteAcc : state->blackAcc;
     }
 
     bool whiteToMove; // True if white is to move
@@ -210,7 +216,5 @@ class Board
     Piece board[64]; // Board representation
 
     BoardState* state; // Current board state
-
-    Accumulator whiteAcc, blackAcc;
 };
 #endif

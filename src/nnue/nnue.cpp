@@ -4,7 +4,7 @@
 #include <fstream>
 #include <iostream>
 
-NNUE* nnue = new NNUE; 
+NNUE* nnue = new NNUE;
 
 bool NNUE::Load(const std::string& filename)
 {
@@ -109,7 +109,7 @@ void NNUE::Add(Accumulator& acc, int index) const
 {
     for (int i = 0; i < 520; i++)
     {
-        acc.data[i] += inputLayer.weights[index][i];
+        acc.data[i] += inputLayer.weights[i][index];
     }
 }
 
@@ -117,7 +117,7 @@ void NNUE::Remove(Accumulator& acc, int index) const
 {
     for (int i = 0; i < 520; i++)
     {
-        acc.data[i] -= inputLayer.weights[index][i];
+        acc.data[i] -= inputLayer.weights[i][index];
     }
 }
 
@@ -125,7 +125,7 @@ void NNUE::Update(Accumulator& acc, int oldIndex, int newIndex) const
 {
     for (int i = 0; i < 520; i++)
     {
-        acc.data[i] += inputLayer.weights[newIndex][i] - inputLayer.weights[oldIndex][i];
+        acc.data[i] += inputLayer.weights[i][newIndex] - inputLayer.weights[i][oldIndex];
     }
 }
 

@@ -6,7 +6,6 @@
 
 #include "halfkav2_hm.h"
 
-
 struct Accumulator
 {
     int32_t data[520];
@@ -25,7 +24,7 @@ struct Layer
     static constexpr int32_t max = MAX;
 
     // Layer parameters
-    weight_t weights[in_size][out_size];
+    weight_t weights[out_size][in_size];
     bias_t biases[out_size];
 
     constexpr int32_t CReLU(int32_t x, int32_t max) const
@@ -33,41 +32,41 @@ struct Layer
         return std::min(std::max(x, 0), max);
     }
 
-    inline void Forward(const Accumulator& us, const Accumulator& them, int32_t *output) const
+    inline void Forward(const Accumulator& us, const Accumulator& them, int32_t* output) const
     {
         for (size_t i = 0; i < out_size; i++)
         {
             int32_t sum = biases[i];
             for (size_t j = 0; j < in_size / 2; j++)
             {
-                sum += weights[j][i] * CReLU(us.data[j], max);
-                sum += weights[j + in_size / 2][i] * CReLU(them.data[j], max);
+                sum += weights[i][j] * CReLU(us.data[j], max);
+                sum += weights[i][j + in_size / 2] * CReLU(them.data[j], max);
             }
             output[i] = (sum + half_scale) / scale; // Round to nearest integer
         }
     }
 
-    inline void Forward(const int32_t *input, int32_t *output) const
+    inline void Forward(const int32_t* input, int32_t* output) const
     {
         for (size_t i = 0; i < out_size; i++)
         {
             int32_t sum = biases[i];
             for (size_t j = 0; j < in_size; j++)
             {
-                sum += static_cast<int32_t>(weights[j][i]) * CReLU(input[j], max);
+                sum += static_cast<int32_t>(weights[i][j]) * CReLU(input[j], max);
             }
             output[i] = (sum + half_scale) / scale; // Round to nearest integer
         }
     }
 
-    inline void Forwardf(const int32_t *input, float *output) const
+    inline void Forwardf(const int32_t* input, float* output) const
     {
         for (size_t i = 0; i < out_size; i++)
         {
             int32_t sum = biases[i];
             for (size_t j = 0; j < in_size; j++)
             {
-                sum += static_cast<int32_t>(weights[j][i]) * CReLU(input[j], max);
+                sum += static_cast<int32_t>(weights[i][j]) * CReLU(input[j], max);
             }
             output[i] = static_cast<float>(sum) / static_cast<float>(scale);
         }

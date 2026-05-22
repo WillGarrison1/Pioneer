@@ -82,20 +82,6 @@ void Board::addPiece(Piece piece, Square square)
     setBit(colorBB[color], square);
 
     board[square] = piece;
-
-    if (piece != makePiece(KING, WHITE))
-    {
-        Square whiteKingSquare = lsb(pieceBB[KING] & colorBB[WHITE]);
-        int whiteIndex = GetIndex(square, whiteKingSquare, static_cast<PieceType>(pieceType - 1), true, color == BLACK);
-        nnue->Add(whiteAcc, whiteIndex);
-    }
-    if (piece != makePiece(KING, BLACK))
-    {
-        Square blackKingSquare = lsb(pieceBB[KING] & colorBB[BLACK]);
-        int blackIndex =
-            GetIndex(square, blackKingSquare, static_cast<PieceType>(pieceType - 1), false, color == BLACK);
-        nnue->Add(blackAcc, blackIndex);
-    }
 }
 
 void Board::removePiece(Square square)
@@ -108,19 +94,6 @@ void Board::removePiece(Square square)
     clearBit(colorBB[color], square);
 
     board[square] = EMPTY;
-    if (piece != makePiece(KING, WHITE))
-    {
-        Square whiteKingSquare = lsb(pieceBB[KING] & colorBB[WHITE]);
-        int whiteIndex = GetIndex(square, whiteKingSquare, static_cast<PieceType>(pieceType - 1), true, color == BLACK);
-        nnue->Remove(whiteAcc, whiteIndex);
-    }
-    if (piece != makePiece(KING, BLACK))
-    {
-        Square blackKingSquare = lsb(pieceBB[KING] & colorBB[BLACK]);
-        int blackIndex =
-            GetIndex(square, blackKingSquare, static_cast<PieceType>(pieceType - 1), false, color == BLACK);
-        nnue->Remove(blackAcc, blackIndex);
-    }
 }
 
 void Board::movePiece(Square from, Square to)
@@ -135,14 +108,72 @@ void Board::movePiece(Square from, Square to)
 
     board[from] = EMPTY;
     board[to] = piece;
+}
 
+void Board::addPieceState(Piece piece, Square square, BoardState* current)
+{
+    current->zobristHash ^= boardHashes[square][piece];
+    addPiece(piece, square);
+
+    const PieceType pieceType = getType(piece);
+    const Color color = getColor(piece);
+    if (piece != makePiece(KING, WHITE))
+    {
+        Square whiteKingSquare = lsb(pieceBB[KING] & colorBB[WHITE]);
+        int whiteIndex = GetIndex(square, whiteKingSquare, static_cast<PieceType>(pieceType - 1), true, color == BLACK);
+        nnue->Add(current->whiteAcc, whiteIndex);
+    }
+    if (piece != makePiece(KING, BLACK))
+    {
+        Square blackKingSquare = lsb(pieceBB[KING] & colorBB[BLACK]);
+        int blackIndex =
+            GetIndex(square, blackKingSquare, static_cast<PieceType>(pieceType - 1), false, color == BLACK);
+        nnue->Add(current->blackAcc, blackIndex);
+    }
+}
+
+void Board::removePieceState(Square square, BoardState* current)
+{
+    const Piece piece = board[square];
+    current->zobristHash ^= boardHashes[square][piece];
+    removePiece(square);
+
+    const PieceType pieceType = getType(piece);
+    const Color color = getColor(piece);
+    if (piece != makePiece(KING, WHITE))
+    {
+        Square whiteKingSquare = lsb(pieceBB[KING] & colorBB[WHITE]);
+        int whiteIndex = GetIndex(square, whiteKingSquare, static_cast<PieceType>(pieceType - 1), true, color == BLACK);
+        nnue->Remove(current->whiteAcc, whiteIndex);
+    }
+    if (piece != makePiece(KING, BLACK))
+    {
+        Square blackKingSquare = lsb(pieceBB[KING] & colorBB[BLACK]);
+        int blackIndex =
+            GetIndex(square, blackKingSquare, static_cast<PieceType>(pieceType - 1), false, color == BLACK);
+        nnue->Remove(current->blackAcc, blackIndex);
+    }
+}
+
+void Board::movePieceState(Square from, Square to, BoardState* current)
+{
+    const Piece piece = board[from];
+    current->zobristHash ^= boardHashes[to][piece] ^ boardHashes[from][piece];
+    movePiece(from, to);
+
+    const PieceType pieceType = getType(piece);
+    const Color color = getColor(piece);
     if (piece != makePiece(KING, WHITE))
     {
         Square whiteKingSquare = lsb(pieceBB[KING] & colorBB[WHITE]);
         int whiteIndexFrom =
             GetIndex(from, whiteKingSquare, static_cast<PieceType>(pieceType - 1), true, color == BLACK);
         int whiteIndexTo = GetIndex(to, whiteKingSquare, static_cast<PieceType>(pieceType - 1), true, color == BLACK);
-        nnue->Update(whiteAcc, whiteIndexFrom, whiteIndexTo);
+        nnue->Update(current->whiteAcc, whiteIndexFrom, whiteIndexTo);
+    }
+    else
+    {
+        ResetWhiteAccumulator();
     }
     if (piece != makePiece(KING, BLACK))
     {
@@ -150,28 +181,12 @@ void Board::movePiece(Square from, Square to)
         int blackIndexFrom =
             GetIndex(from, blackKingSquare, static_cast<PieceType>(pieceType - 1), false, color == BLACK);
         int blackIndexTo = GetIndex(to, blackKingSquare, static_cast<PieceType>(pieceType - 1), false, color == BLACK);
-        nnue->Update(blackAcc, blackIndexFrom, blackIndexTo);
+        nnue->Update(current->blackAcc, blackIndexFrom, blackIndexTo);
     }
-}
-
-void Board::addPieceZobrist(Piece piece, Square square, Key& key)
-{
-    key ^= boardHashes[square][piece];
-    addPiece(piece, square);
-}
-
-void Board::removePieceZobrist(Square square, Key& key)
-{
-    const Piece piece = board[square];
-    key ^= boardHashes[square][piece];
-    removePiece(square);
-}
-
-void Board::movePieceZobrist(Square from, Square to, Key& key)
-{
-    const Piece piece = board[from];
-    key ^= boardHashes[to][piece] ^ boardHashes[from][piece];
-    movePiece(from, to);
+    else
+    {
+        ResetBlackAccumulator();
+    }
 }
 
 void Board::makeMove(Move move, BoardState* newState)
@@ -211,13 +226,13 @@ void Board::makeMove(Move move, BoardState* newState)
         {
             if (kingSide)
             {
-                movePieceZobrist(SQ_E1, SQ_G1, newState->zobristHash);
-                movePieceZobrist(SQ_H1, SQ_F1, newState->zobristHash);
+                movePieceState(SQ_E1, SQ_G1, newState);
+                movePieceState(SQ_H1, SQ_F1, newState);
             }
             else
             {
-                movePieceZobrist(SQ_E1, SQ_C1, newState->zobristHash);
-                movePieceZobrist(SQ_A1, SQ_D1, newState->zobristHash);
+                movePieceState(SQ_E1, SQ_C1, newState);
+                movePieceState(SQ_A1, SQ_D1, newState);
             }
 
             newState->castling &= ~(CASTLE_WK | CASTLE_WQ);
@@ -226,13 +241,13 @@ void Board::makeMove(Move move, BoardState* newState)
         {
             if (kingSide)
             {
-                movePieceZobrist(SQ_E8, SQ_G8, newState->zobristHash);
-                movePieceZobrist(SQ_H8, SQ_F8, newState->zobristHash);
+                movePieceState(SQ_E8, SQ_G8, newState);
+                movePieceState(SQ_H8, SQ_F8, newState);
             }
             else
             {
-                movePieceZobrist(SQ_E8, SQ_C8, newState->zobristHash);
-                movePieceZobrist(SQ_A8, SQ_D8, newState->zobristHash);
+                movePieceState(SQ_E8, SQ_C8, newState);
+                movePieceState(SQ_A8, SQ_D8, newState);
             }
 
             newState->castling &= ~(CASTLE_BK | CASTLE_BQ);
@@ -276,14 +291,14 @@ void Board::makeMove(Move move, BoardState* newState)
         {
             newState->move50rule = 0; // reset 50 move repetition counter on en passant
             Square attacked = to - (whiteToMove ? NORTH : SOUTH);
-            removePieceZobrist(attacked, newState->zobristHash);
+            removePieceState(attacked, newState);
 
             newState->pawn_material -= pieceScores[PAWN] * (whiteToMove ? -1 : 1);
         }
         else if (captured != EMPTY)
         {
             newState->move50rule = 0; // reset 50 move repetition counter on capture
-            removePieceZobrist(to, newState->zobristHash);
+            removePieceState(to, newState);
 
             PieceType captureType = getType(captured);
 
@@ -298,7 +313,7 @@ void Board::makeMove(Move move, BoardState* newState)
             }
         }
 
-        movePieceZobrist(from, to, newState->zobristHash);
+        movePieceState(from, to, newState);
 
         if (pieceType == PAWN)
         {
@@ -306,8 +321,8 @@ void Board::makeMove(Move move, BoardState* newState)
             if (move.type() == PROMOTION)
             {
                 PieceType promote = move.promotion();
-                removePieceZobrist(to, newState->zobristHash);
-                addPieceZobrist(makePiece(promote, color), to, newState->zobristHash);
+                removePieceState(to, newState);
+                addPieceState(makePiece(promote, color), to, newState);
 
                 newState->pawn_material -= pieceScores[PAWN] * (whiteToMove ? 1 : -1);
                 newState->non_pawn_material += pieceScores[promote] * (whiteToMove ? 1 : -1);
@@ -539,9 +554,6 @@ void Board::clear()
     {
         board[i] = EMPTY;
     }
-
-    nnue->Reset(whiteAcc);
-    nnue->Reset(blackAcc);
 }
 
 void Board::setFen(const std::string& fen, BoardState* newState)
@@ -592,21 +604,8 @@ void Board::setFen(const std::string& fen, BoardState* newState)
         }
     }
 
-    Square whiteKingSquare = lsb(pieceBB[KING] & colorBB[WHITE]);
-    Square blackKingSquare = lsb(pieceBB[KING] & colorBB[BLACK]);
-    for (PieceType i = PAWN; i < ALL_PIECES; i = static_cast<PieceType>(i + 1))
-    {
-        Bitboard bb = pieceBB[i];
-        while (bb)
-        {
-            Square sqr = popLSB(bb);
-            Color color = getColor(board[sqr]);
-            int whiteIndex = GetIndex(sqr, whiteKingSquare, static_cast<PieceType>(i - 1), true, color == BLACK);
-            int blackIndex = GetIndex(sqr, blackKingSquare, static_cast<PieceType>(i - 1), false, color == BLACK);
-            nnue->Add(whiteAcc, whiteIndex);
-            nnue->Add(blackAcc, blackIndex);
-        }
-    }
+    ResetWhiteAccumulator();
+    ResetBlackAccumulator();
 
     pieceBB[ALL_PIECES] = colorBB[WHITE] | colorBB[BLACK];
     pieceBB[EMPTY] = ~pieceBB[ALL_PIECES];
@@ -663,6 +662,46 @@ void Board::setFen(const std::string& fen, BoardState* newState)
         state->checkers = getAttackers<BLACK>(lsb(getBB(WHITE, KING)));
     else
         state->checkers = getAttackers<WHITE>(lsb(getBB(BLACK, KING)));
+}
+
+void Board::ResetWhiteAccumulator()
+{
+    nnue->Reset(state->whiteAcc);
+    Square whiteKingSquare = lsb(pieceBB[KING] & colorBB[WHITE]);
+    Square blackKingSquare = lsb(pieceBB[KING] & colorBB[BLACK]);
+    for (PieceType i = PAWN; i < KING; i = static_cast<PieceType>(i + 1))
+    {
+        Bitboard bb = pieceBB[i];
+        while (bb)
+        {
+            Square sqr = popLSB(bb);
+            Color color = getColor(board[sqr]);
+            int whiteIndex = GetIndex(sqr, whiteKingSquare, static_cast<PieceType>(i - 1), true, color == BLACK);
+            nnue->Add(state->whiteAcc, whiteIndex);
+        }
+    }
+    int whiteIndex = GetIndex(blackKingSquare, whiteKingSquare, static_cast<PieceType>(KING - 1), true, true);
+    nnue->Add(state->whiteAcc, whiteIndex);
+}
+
+void Board::ResetBlackAccumulator()
+{
+    nnue->Reset(state->blackAcc);
+    Square whiteKingSquare = lsb(pieceBB[KING] & colorBB[WHITE]);
+    Square blackKingSquare = lsb(pieceBB[KING] & colorBB[BLACK]);
+    for (PieceType i = PAWN; i < KING; i = static_cast<PieceType>(i + 1))
+    {
+        Bitboard bb = pieceBB[i];
+        while (bb)
+        {
+            Square sqr = popLSB(bb);
+            Color color = getColor(board[sqr]);
+            int blackIndex = GetIndex(sqr, blackKingSquare, static_cast<PieceType>(i - 1), false, color == BLACK);
+            nnue->Add(state->blackAcc, blackIndex);
+        }
+    }
+    int blackIndex = GetIndex(whiteKingSquare, blackKingSquare, static_cast<PieceType>(KING - 1), false, false);
+    nnue->Add(state->blackAcc, blackIndex);
 }
 
 // Updates attacked bitboard and returns number of checks of the opposing king

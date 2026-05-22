@@ -95,10 +95,11 @@ void Engine::goPerft(unsigned int depth)
 
 void Engine::eval()
 {
-    Score score = Eval<FULL>(*board) * (board->whiteToMove ? 1 : -1);
+    Score score = nnue->Evaluate(*board);
+    Score psqt = nnue->FastEvaluate(*board);
     std::cout << "Eval: " << score << std::endl;
-    std::cout << "Pawns: " << board->getPawnMaterial() << std::endl;
-    std::cout << "Other: " << board->getNonPawnMaterial() << std::endl;
+    std::cout << "Positional: " << score - psqt << std::endl;
+    std::cout << "Psqt: " << psqt << std::endl;
 }
 
 void Engine::isCheck(Move move)
