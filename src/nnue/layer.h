@@ -8,7 +8,7 @@
 
 struct Accumulator
 {
-    int32_t data[520];
+    int16_t data[520];
 };
 
 template <typename W_T, typename B_T, size_t IN, size_t OUT, int SCALE = 64, int32_t MAX = 127>
