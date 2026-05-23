@@ -350,17 +350,6 @@ void Board::makeMove(Move move, BoardState* newState)
     pieceBB[ALL_PIECES] = colorBB[WHITE] | colorBB[BLACK];
     pieceBB[EMPTY] = ~pieceBB[ALL_PIECES];
 
-    const Square kingWSquareEnd = lsb(getBB(WHITE, KING));
-    const Square kingBSquareEnd = lsb(getBB(BLACK, KING));
-    if (kingWSquareStart != kingWSquareEnd)
-    {
-        ResetWhiteAccumulator();
-    }
-    if (kingBSquareStart != kingBSquareEnd)
-    {
-        ResetBlackAccumulator();
-    }
-
     // Update state
     ply++;
 
@@ -371,6 +360,18 @@ void Board::makeMove(Move move, BoardState* newState)
     newState->zobristHash ^= castleRightsHash[newState->castling];
     newState->prev = state;
     state = newState;
+
+    // reset accumulators if king moved
+    const Square kingWSquareEnd = lsb(getBB(WHITE, KING));
+    const Square kingBSquareEnd = lsb(getBB(BLACK, KING));
+    if (kingWSquareStart != kingWSquareEnd)
+    {
+        ResetWhiteAccumulator();
+    }
+    if (kingBSquareStart != kingBSquareEnd)
+    {
+        ResetBlackAccumulator();
+    }
 
     state->repetition = getRepetition();
 

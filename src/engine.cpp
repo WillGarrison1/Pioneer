@@ -95,8 +95,8 @@ void Engine::goPerft(unsigned int depth)
 
 void Engine::eval()
 {
-    Score score = nnue->Evaluate(*board);
-    Score psqt = nnue->FastEvaluate(*board);
+    Score score = nnue->Evaluate(*board) * (board->whiteToMove ? 1 : -1);
+    Score psqt = nnue->FastEvaluate(*board) * (board->whiteToMove ? 1 : -1);
     std::cout << "Eval: " << score << std::endl;
     std::cout << "Positional: " << score - psqt << std::endl;
     std::cout << "Psqt: " << psqt << std::endl;
