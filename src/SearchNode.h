@@ -19,12 +19,14 @@ struct SearchNode
 {
     SearchNode()
     {
+        staticEval = 0;
         accumulatorNode.isBlackComputed = accumulatorNode.isWhiteComputed = false;
         accumulatorNode.dirtyMove.movePiece = EMPTY;
     }
 
     SearchNode(SearchNode* parent) : prev(parent)
     {
+        staticEval = 0;
         accumulatorNode.isBlackComputed = accumulatorNode.isWhiteComputed = false;
         accumulatorNode.dirtyMove.movePiece = EMPTY;
     }

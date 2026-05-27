@@ -180,10 +180,8 @@ void NNUE::AddAddSubSub(Accumulator& acc, int add1, int add2, int sub1, int sub2
 
 void NNUE::Reset(Accumulator& acc) const
 {
-    for (int i = 0; i < 512; i++)
-    {
-        acc.data[i] = inputLayer.biases[i];
-    }
+    std::memcpy(acc.data, inputLayer.biases, sizeof(acc.data));
+
     for (int i = 0; i < 8; i++)
     {
         acc.psqt[i] = inputLayer.biases[i + 512];

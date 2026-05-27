@@ -26,7 +26,7 @@ struct Layer
     alignas(64) weight_t weights[row][column];
     alignas(64) bias_t biases[out_size];
 
-    constexpr int32_t CReLU(int32_t x, int32_t max) const
+    constexpr int32_t CReLU(const int32_t x, const int32_t max) const
     {
         return std::min(std::max(x, 0), max);
     }
@@ -35,13 +35,20 @@ struct Layer
     {
         static_assert(!isInputLayer, "Cannot call forward on input layer!");
 
+        int8_t us_relu[in_size / 2], them_relu[in_size / 2];
+        for (size_t j = 0; j < in_size / 2; j++)
+        {
+            us_relu[j] = CReLU(us.data[j], max);
+            them_relu[j] = CReLU(them.data[j], max);
+        }
+
         for (size_t i = 0; i < out_size; i++)
         {
             int32_t sum = biases[i];
             for (size_t j = 0; j < in_size / 2; j++)
             {
-                sum += weights[i][j] * CReLU(us.data[j], max);
-                sum += weights[i][j + in_size / 2] * CReLU(them.data[j], max);
+                sum += weights[i][j] * us_relu[j];
+                sum += weights[i][j + in_size / 2] * them_relu[j];
             }
             output[i] = (sum + half_scale) / scale; // Round to nearest integer
         }
