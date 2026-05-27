@@ -253,6 +253,7 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, SearchNo
     numNodes++;
     Move bestEntryMove = 0;
     node->pvLine.len = 0;
+    bool inCheck = board.getNumChecks() > 0;
 
     if constexpr (isRootNode)
     {
@@ -299,17 +300,26 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, SearchNo
         depth -= depth > IIR_DEPTH;
     }
 
-    Score staticEval = Eval<FULL>(board, node);
+    Score staticEval;
+    if (!inCheck)
+        staticEval = Eval<FULL>(board, node);
+    else if (node->prev && node->prev->prev)
+        staticEval = node->prev->prev->staticEval;
+    else
+        staticEval = 0;
+
+    node->staticEval = staticEval;
+
     if (!entry)
-        ttOrStaticScore = staticEval;
+        ttOrStaticScore = node->staticEval;
 
     MoveList moves;
     board.generateMoves<ALL_MOVES>(&moves);
 
     if (moves.GetSize() == 0)
     {
-        Score mateScore = 0;      // stalemate
-        if (board.getNumChecks()) // if in check, then checkmate
+        Score mateScore = 0; // stalemate
+        if (inCheck)         // if in check, then checkmate
             mateScore = -MATE + ply;
 
         tTable->SetEntry(board.getHash(), mateToTT(mateScore, ply), depth, NodeBound::Exact, 0);
@@ -317,7 +327,7 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, SearchNo
     }
 
     // reverse futility pruning
-    if (!isPVNode && !board.getNumChecks() && depth <= 8)
+    if (!isPVNode && !inCheck && depth <= 8)
     {
         Score margin = 120 * depth;
 
@@ -328,7 +338,7 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, SearchNo
     }
 
     // razoring
-    if (!isPVNode && !board.getNumChecks() && depth <= 3)
+    if (!isPVNode && !inCheck && depth <= 3)
     {
         Score margin = 300 + (100 * depth);
 
@@ -343,8 +353,8 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, SearchNo
     // null move pruning
 
     int numOurPieces = popCount(board.getBB(ALL_PIECES, board.sideToMove) & ~board.getBB(PAWN));
-    if (!isPVNode && numOurPieces > 0 && board.getNumChecks() == 0 && depth >= NULL_DEPTH && !isLoss(beta) &&
-        nullMoveAllowed && staticEval >= beta)
+    if (!isPVNode && numOurPieces > 0 && !inCheck && depth >= NULL_DEPTH && !isLoss(beta) && nullMoveAllowed &&
+        staticEval >= beta)
     {
         int newDepth = depth * 2 / 3 - 1;
 
@@ -379,7 +389,7 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, SearchNo
     {
         Move move = sorter.Next();
 
-        if (!isPVNode && !board.getNumChecks() && move.isType<QUIET>())
+        if (!isPVNode && !inCheck && move.isType<QUIET>())
         {
             if (lmpCount++ >= lmpThreshold) // lmp
                 continue;
@@ -393,7 +403,7 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, SearchNo
         //     extension = 1;
 
         // Futility pruning
-        if (!isPVNode && !board.getNumChecks() && depth < FUTILITY_DEPTH && move.type() == QUIET && !checkMove)
+        if (!isPVNode && !inCheck && depth < FUTILITY_DEPTH && move.type() == QUIET && !checkMove)
         {
             Score eval = ttOrStaticScore + FUTILITY_MARGIN(depth);
             if (eval <= alpha)

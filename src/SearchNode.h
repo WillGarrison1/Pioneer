@@ -33,6 +33,7 @@ struct SearchNode
 
     PVLine pvLine;
     AccumulatorNode accumulatorNode;
+    Score staticEval;
 
     SearchNode* prev;
 };

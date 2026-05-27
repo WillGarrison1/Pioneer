@@ -257,7 +257,7 @@ void Board::makeMove(Move move, BoardState* newState, DirtyMove& dirtyMove)
 
             dirtyMove.capturedPiece = board[attacked];
             dirtyMove.captured = attacked;
-            
+
             removePieceState(attacked, newState);
 
             newState->pawn_material -= pieceScores[PAWN] * (whiteToMove ? -1 : 1);
@@ -409,7 +409,7 @@ void Board::undoMove()
             movePiece(to, from);
         }
 
-        if (state->prev && move.to() == state->prev->enPassantSquare)
+        if (state->prev && move.to() == state->prev->enPassantSquare && getType(board[from]) == PAWN)
         {
             const Square attacked =
                 to - (whiteToMove ? NORTH : SOUTH); // Switched directions because whiteToMove hasn't been reversed yet

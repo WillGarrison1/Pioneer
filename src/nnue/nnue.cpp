@@ -16,8 +16,18 @@ bool NNUE::Load(const std::string& filename)
         return false;
     }
 
-    // Load the input layer parameters
-    params.read(reinterpret_cast<char*>(&inputLayer), sizeof(inputLayer));
+    // Load using old [520][NUM_FEATURES] layout
+    using OldInputLayer = Layer<int16_t, int16_t, NUM_FEATURES, 520, 64, 127, false>;
+    auto* temp = new OldInputLayer;
+    params.read(reinterpret_cast<char*>(temp), sizeof(*temp));
+
+    // Transpose into inputLayer (IS_INPUT=true → weights[NUM_FEATURES][520])
+    std::memcpy(inputLayer.biases, temp->biases, sizeof(inputLayer.biases));
+    for (int i = 0; i < 520; i++)
+        for (int j = 0; j < NUM_FEATURES; j++)
+            inputLayer.weights[j][i] = temp->weights[i][j];
+
+    delete temp;
 
     for (int i = 0; i < 8; i++)
     {
@@ -101,11 +111,11 @@ void NNUE::Add(Accumulator& acc, int index) const
 {
     for (int i = 0; i < 512; i++)
     {
-        acc.data[i] += inputLayer.weights[i][index];
+        acc.data[i] += inputLayer.weights[index][i];
     }
     for (int i = 0; i < 8; i++)
     {
-        acc.psqt[i] += inputLayer.weights[i + 512][index];
+        acc.psqt[i] += inputLayer.weights[index][i + 512];
     }
 }
 
@@ -113,11 +123,11 @@ void NNUE::Remove(Accumulator& acc, int index) const
 {
     for (int i = 0; i < 512; i++)
     {
-        acc.data[i] -= inputLayer.weights[i][index];
+        acc.data[i] -= inputLayer.weights[index][i];
     }
     for (int i = 0; i < 8; i++)
     {
-        acc.psqt[i] -= inputLayer.weights[i + 512][index];
+        acc.psqt[i] -= inputLayer.weights[index][i + 512];
     }
 }
 
@@ -125,11 +135,11 @@ void NNUE::Update(Accumulator& acc, int oldIndex, int newIndex) const
 {
     for (int i = 0; i < 512; i++)
     {
-        acc.data[i] += inputLayer.weights[i][newIndex] - inputLayer.weights[i][oldIndex];
+        acc.data[i] += inputLayer.weights[newIndex][i] - inputLayer.weights[oldIndex][i];
     }
     for (int i = 0; i < 8; i++)
     {
-        acc.psqt[i] += inputLayer.weights[i + 512][newIndex] - inputLayer.weights[i + 512][oldIndex];
+        acc.psqt[i] += inputLayer.weights[newIndex][i + 512] - inputLayer.weights[oldIndex][i + 512];
     }
 }
 

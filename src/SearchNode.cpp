@@ -4,6 +4,8 @@
 #include "piece.h"
 #include <iostream>
 
+// #define VERIFY_ACCUMULATOR
+
 void SearchNode::ComputeAccumulator(const Board& board)
 {
     Square whiteKingSquare = lsb(board.getBB(WHITE, KING));
@@ -156,4 +158,14 @@ void SearchNode::ComputeAccumulator(const Board& board)
     }
 
     accumulatorNode.isWhiteComputed = true;
+
+#ifdef VERIFY_ACCUMULATOR
+    Accumulator refWhite, refBlack;
+    board.ResetWhiteAccumulator(refWhite);
+    board.ResetBlackAccumulator(refBlack);
+    assert(std::memcmp(refWhite.data, accumulatorNode.whiteAcc.data, sizeof(refWhite.data)) == 0);
+    assert(std::memcmp(refBlack.data, accumulatorNode.blackAcc.data, sizeof(refBlack.data)) == 0);
+    assert(std::memcmp(refWhite.psqt, accumulatorNode.whiteAcc.psqt, sizeof(refWhite.psqt)) == 0);
+    assert(std::memcmp(refBlack.psqt, accumulatorNode.blackAcc.psqt, sizeof(refBlack.psqt)) == 0);
+#endif
 }
