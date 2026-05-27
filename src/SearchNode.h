@@ -17,10 +17,16 @@ struct PVLine
 
 struct SearchNode
 {
-    SearchNode() = default;
+    SearchNode()
+    {
+        accumulatorNode.isBlackComputed = accumulatorNode.isWhiteComputed = false;
+        accumulatorNode.dirtyMove.movePiece = EMPTY;
+    }
+
     SearchNode(SearchNode* parent) : prev(parent)
     {
         accumulatorNode.isBlackComputed = accumulatorNode.isWhiteComputed = false;
+        accumulatorNode.dirtyMove.movePiece = EMPTY;
     }
 
     void ComputeAccumulator(const Board& board);

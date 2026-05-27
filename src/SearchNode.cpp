@@ -74,19 +74,22 @@ void SearchNode::ComputeAccumulator(const Board& board)
 
             acc.Update(dirtyMove.from, dirtyMove.to, blackKingSquare, fromPiece, toPiece, false);
 
-            if (dirtyMove.capturedPiece == EMPTY)
+            if (dirtyMove.castleFrom != SQ_NONE)
             {
-                current = current->prev;
-                continue;
+                Piece rook = makePiece(ROOK, getColor(fromPiece));
+                acc.Update(dirtyMove.castleFrom, dirtyMove.castleTo, blackKingSquare, rook, rook, false);
             }
 
-            acc.Remove(dirtyMove.captured, blackKingSquare, dirtyMove.captured, false);
+            if (dirtyMove.capturedPiece != EMPTY)
+            {
+                acc.Remove(dirtyMove.captured, blackKingSquare, dirtyMove.capturedPiece, false);
+            }
 
             current = current->prev;
         }
     }
 
-    accumulatorNode.isBlackComputed = accumulatorNode.isWhiteComputed = true;
+    accumulatorNode.isBlackComputed = true;
 
     bool needsFullRefreshWhite = false;
 
@@ -135,19 +138,22 @@ void SearchNode::ComputeAccumulator(const Board& board)
                 toPiece = dirtyMove.promote;
             }
 
-            acc.Update(dirtyMove.from, dirtyMove.to, whiteKingSquare, fromPiece, toPiece, false);
+            acc.Update(dirtyMove.from, dirtyMove.to, whiteKingSquare, fromPiece, toPiece, true);
 
-            if (dirtyMove.capturedPiece == EMPTY)
+            if (dirtyMove.castleFrom != SQ_NONE)
             {
-                current = current->prev;
-                continue;
+                Piece rook = makePiece(ROOK, getColor(fromPiece));
+                acc.Update(dirtyMove.castleFrom, dirtyMove.castleTo, whiteKingSquare, rook, rook, true);
             }
 
-            acc.Remove(dirtyMove.captured, whiteKingSquare, dirtyMove.captured, false);
+            if (dirtyMove.capturedPiece != EMPTY)
+            {
+                acc.Remove(dirtyMove.captured, whiteKingSquare, dirtyMove.capturedPiece, true);
+            }
 
             current = current->prev;
         }
     }
 
-    accumulatorNode.isWhiteComputed = accumulatorNode.isWhiteComputed = true;
+    accumulatorNode.isWhiteComputed = true;
 }

@@ -190,7 +190,7 @@ Score qsearch(Board& board, int ply, Score alpha, Score beta, SearchNode* node)
         }
 
         SearchNode child(node);
-        board.makeMove(m, &state, node->accumulatorNode.dirtyMove);
+        board.makeMove(m, &state, child.accumulatorNode.dirtyMove);
         Score score = -qsearch(board, ply + 1, -beta, -alpha, &child);
         board.undoMove();
 
@@ -401,7 +401,7 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, SearchNo
         }
 
         SearchNode child(node);
-        board.makeMove(move, &state, node->accumulatorNode.dirtyMove);
+        board.makeMove(move, &state, child.accumulatorNode.dirtyMove);
         tTable->Prefetch(board.getHash());
 
         // Late move reductions (LMR)

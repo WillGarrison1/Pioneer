@@ -254,9 +254,11 @@ void Board::makeMove(Move move, BoardState* newState, DirtyMove& dirtyMove)
         {
             newState->move50rule = 0; // reset 50 move repetition counter on en passant
             Square attacked = to - (whiteToMove ? NORTH : SOUTH);
-            removePieceState(attacked, newState);
+
             dirtyMove.capturedPiece = board[attacked];
             dirtyMove.captured = attacked;
+            
+            removePieceState(attacked, newState);
 
             newState->pawn_material -= pieceScores[PAWN] * (whiteToMove ? -1 : 1);
         }
@@ -266,6 +268,7 @@ void Board::makeMove(Move move, BoardState* newState, DirtyMove& dirtyMove)
             removePieceState(to, newState);
 
             PieceType captureType = getType(captured);
+            dirtyMove.captured = to;
 
             switch (captureType)
             {
