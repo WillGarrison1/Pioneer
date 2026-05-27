@@ -19,10 +19,11 @@ unsigned long long perft(Board& board, unsigned int depth)
     unsigned long long moveCount = 0;
 
     BoardState state;
+    DirtyMove dirtyMove;
 
     for (Move* m = moves.moves; m < moves.end; m++)
     {
-        board.makeMove(*m, &state);
+        board.makeMove(*m, &state, dirtyMove);
         moveCount += perft(board, depth - 1);
         board.undoMove();
     }

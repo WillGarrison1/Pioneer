@@ -68,18 +68,14 @@ bool NNUE::Load(const std::string& filename)
     return true;
 }
 
-float NNUE::Evaluate(const Board& board) const
+float NNUE::Evaluate(const Board& board, const Accumulator& us, const Accumulator& them) const
 {
-    Color stm = board.whiteToMove ? WHITE : BLACK;
-    const Accumulator& us = board.getAccumulator(stm);
-    const Accumulator& them = board.getAccumulator(~stm);
-
     int numPieces = popCount(board.getBB(ALL_PIECES));
     int index = (numPieces - 2) / 4;
 
     assert(index >= 0 && index < 8); // Ensure index is within bounds
 
-    float psqt = (us.data[512 + index] - them.data[512 + index]) / 2.0f;
+    float psqt = (us.psqt[index] - them.psqt[index]) / 2.0f;
     float output = Forward(index, us, them);
     return (output + psqt) * 500.0f / 127.0f;
 }
@@ -90,49 +86,61 @@ float NNUE::Forward(int subnet, const Accumulator& us, const Accumulator& them) 
     return subnets[subnet].Forward(us, them);
 }
 
-float NNUE::FastEvaluate(const Board& board) const
+float NNUE::FastEvaluate(const Board& board, const Accumulator& us, const Accumulator& them) const
 {
-    Color stm = board.whiteToMove ? WHITE : BLACK;
-    const Accumulator& us = board.getAccumulator(stm);
-    const Accumulator& them = board.getAccumulator(~stm);
-
     int numPieces = popCount(board.getBB(ALL_PIECES));
     int index = (numPieces - 2) / 4;
 
     assert(index >= 0 && index < 8); // Ensure index is within bounds
 
-    float psqt = (us.data[512 + index] - them.data[512 + index]) / 2.0f;
+    float psqt = (us.psqt[index] - them.psqt[index]) / 2.0f;
     return psqt * 500.0f / 127.0f;
 }
 
 void NNUE::Add(Accumulator& acc, int index) const
 {
-    for (int i = 0; i < 520; i++)
+    for (int i = 0; i < 512; i++)
     {
         acc.data[i] += inputLayer.weights[i][index];
+    }
+    for (int i = 0; i < 8; i++)
+    {
+        acc.psqt[i] += inputLayer.weights[i + 512][index];
     }
 }
 
 void NNUE::Remove(Accumulator& acc, int index) const
 {
-    for (int i = 0; i < 520; i++)
+    for (int i = 0; i < 512; i++)
     {
         acc.data[i] -= inputLayer.weights[i][index];
+    }
+    for (int i = 0; i < 8; i++)
+    {
+        acc.psqt[i] -= inputLayer.weights[i + 512][index];
     }
 }
 
 void NNUE::Update(Accumulator& acc, int oldIndex, int newIndex) const
 {
-    for (int i = 0; i < 520; i++)
+    for (int i = 0; i < 512; i++)
     {
         acc.data[i] += inputLayer.weights[i][newIndex] - inputLayer.weights[i][oldIndex];
+    }
+    for (int i = 0; i < 8; i++)
+    {
+        acc.psqt[i] += inputLayer.weights[i + 512][newIndex] - inputLayer.weights[i + 512][oldIndex];
     }
 }
 
 void NNUE::Reset(Accumulator& acc) const
 {
-    for (int i = 0; i < 520; i++)
+    for (int i = 0; i < 512; i++)
     {
         acc.data[i] = inputLayer.biases[i];
+    }
+    for (int i = 0; i < 8; i++)
+    {
+        acc.psqt[i] = inputLayer.biases[i + 512];
     }
 }

@@ -1,11 +1,12 @@
 #include "evaluate.h"
 
 #include "PieceTable.h"
+#include "SearchNode.h"
 #include "bitboard.h"
 #include "board.h"
 #include "color.h"
-#include "profile.h"
 #include "nnue/nnue.h"
+#include "profile.h"
 
 #define DEFENDED_BONUS 10    // bonus for defended piece
 #define ATTACKED_PENALTY -15 // penalty for attacked piece
@@ -215,7 +216,7 @@ Score EvalPiece<PAWN>(const Board& board)
 }
 
 template <EvalType type>
-Score Evaluate(Board& board)
+Score Evaluate(Board& board, SearchNode* node)
 {
     PROFILE_FUNC();
 
@@ -228,19 +229,24 @@ Score Evaluate(Board& board)
 
     score += board.getPawnMaterial() + board.getNonPawnMaterial(); // score material
 #else
-    Score score = nnue->Evaluate(board);
+
+    Accumulator& us = board.whiteToMove ? node->accumulatorNode.whiteAcc : node->accumulatorNode.blackAcc;
+    Accumulator& them = board.whiteToMove ? node->accumulatorNode.blackAcc : node->accumulatorNode.whiteAcc;
+
+    node->ComputeAccumulator(board);
+    Score score = nnue->Evaluate(board, us, them);
 #endif
     return score;
 }
 
 template <>
-Score Eval<FULL>(Board& board)
+Score Eval<FULL>(Board& board, SearchNode* node)
 {
-    return Evaluate<FULL>(board);
+    return Evaluate<FULL>(board, node);
 }
 
 template <>
-Score Eval<FAST>(Board& board)
+Score Eval<FAST>(Board& board, SearchNode* node)
 {
     return (board.getPawnMaterial() + board.getNonPawnMaterial()) * (board.whiteToMove ? 1 : -1);
 }

@@ -1,14 +1,15 @@
 #ifndef HALFKAV2_HM_H
 #define HALFKAV2_HM_H
 
-#include "../types.h"
 #include "../square.h"
+#include "../types.h"
+#include "../color.h"
+#include "../piece.h"
 #include <cassert>
 
 #define NUM_FEATURES 22528
 
-constexpr int GetIndex(Square square, Square king_square, const PieceType piece, const bool whitePOV,
-                             const bool isBlackPiece)
+constexpr int GetIndex(Square square, Square king_square, const Piece piece, const bool whitePOV)
 {
     if (getFile(king_square) > FILE_D)
     {
@@ -27,9 +28,13 @@ constexpr int GetIndex(Square square, Square king_square, const PieceType piece,
 
     king_square -= int(king_square / 8) * 4;
 
-    uint16_t output = (king_square * 11 * 64) +
-                      (static_cast<uint32_t>(piece) * 2 + ((piece + 1 == KING) ? 0 : (isBlackPiece == whitePOV))) * 64 +
-                      square;
+    int kingBucket = king_square * 11 * 64;
+
+    bool isBlackPiece = getColor(piece) == BLACK;
+    PieceType pType = getType(piece);
+    bool isEnemy = isBlackPiece == whitePOV && pType != KING;
+
+    uint16_t output = kingBucket + ((pType - 1) * 2 + isEnemy) * 64 + square;
 
     assert(output < NUM_FEATURES);
 

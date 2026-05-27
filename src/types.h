@@ -5,14 +5,15 @@
 
 // #define MAGIC_GEN (does nothing right now)
 // #define PERFT (enable to get faster perft times)
+#define MAX_DEPTH 256
 
-enum Color : unsigned int
+enum Color : int8_t
 {
     WHITE,
     BLACK = 8
 };
 
-enum PieceType : unsigned int
+enum PieceType : int8_t
 {
     EMPTY = 0,
     PAWN,
@@ -25,7 +26,7 @@ enum PieceType : unsigned int
 };
 
 // clang-format off
-enum Square : unsigned int
+enum Square : int8_t
 {
     SQ_A1, SQ_B1, SQ_C1, SQ_D1, SQ_E1, SQ_F1, SQ_G1, SQ_H1,
     SQ_A2, SQ_B2, SQ_C2, SQ_D2, SQ_E2, SQ_F2, SQ_G2, SQ_H2,
@@ -40,7 +41,7 @@ enum Square : unsigned int
 };
 // clang-format on
 
-enum File : int
+enum File : int8_t
 {
     FILE_A,
     FILE_B,
@@ -52,7 +53,7 @@ enum File : int
     FILE_H
 };
 
-enum Rank : int
+enum Rank : int8_t
 {
     RANK_1,
     RANK_2,
@@ -91,7 +92,7 @@ constexpr File operator++(File& file, const int)
     return temp;
 }
 
-enum Direction : char
+enum Direction : int8_t
 {
     NONE_DIR = 0,
     NORTH = 8,
@@ -104,7 +105,7 @@ enum Direction : char
     SOUTH_WEST = SOUTH + WEST
 };
 
-enum CastlingRights : unsigned char
+enum CastlingRights : uint8_t
 {
     NONE_CASTLE = 0,
     CASTLE_WK = 1,
@@ -137,7 +138,7 @@ inline void operator|=(CastlingRights& a, CastlingRights b)
     a = a | b;
 }
 
-enum MoveType : unsigned int
+enum MoveType : int8_t
 {
     QUIET = 0,
     CAPTURE = 1,
@@ -152,10 +153,10 @@ constexpr MoveType operator|(MoveType a, MoveType b)
 }
 // typedefs
 
-typedef unsigned int Piece;
-typedef unsigned long long Bitboard;
+typedef uint8_t Piece;
 typedef int Score;
-typedef unsigned long long Key;
+typedef uint64_t Bitboard;
+typedef uint64_t Key;
 
 // Forward declarations
 

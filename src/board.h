@@ -20,8 +20,6 @@ struct BoardState
 {
     BoardState* prev;
 
-    Accumulator whiteAcc, blackAcc;
-
     Bitboard attacks[2]; // the attacks a side has (white = 0 black = 1)
     Bitboard checkers;
     Key zobristHash;
@@ -54,9 +52,9 @@ class Board
 
     void addPieceState(const Piece piece, const Square to, BoardState* state);
     void removePieceState(const Square from, BoardState* state);
-    void movePieceState(const Square from, const Square to, BoardState* state); // moves the piece and updates the zobrist hash
+    void movePieceState(const Square from, const Square to, BoardState* state);
 
-    void makeMove(const Move move, BoardState* newState);
+    void makeMove(const Move move, BoardState* newState, DirtyMove& dirtyMove);
     void undoMove();
 
     void makeNullMove(BoardState* state);
@@ -83,8 +81,8 @@ class Board
 
     void setFen(const std::string& fen, BoardState* newState);
 
-    void ResetWhiteAccumulator();
-    void ResetBlackAccumulator();
+    void ResetWhiteAccumulator(Accumulator& whiteAcc) const;
+    void ResetBlackAccumulator(Accumulator& blackAcc) const;
 
     std::string getFen() const;
 
@@ -197,11 +195,6 @@ class Board
     inline unsigned int getPly() const
     {
         return ply;
-    }
-
-    inline const Accumulator& getAccumulator(Color color) const
-    {
-        return (color == WHITE) ? state->whiteAcc : state->blackAcc;
     }
 
     bool whiteToMove; // True if white is to move

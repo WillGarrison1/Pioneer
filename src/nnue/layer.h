@@ -5,11 +5,7 @@
 #include <cstring>
 
 #include "halfkav2_hm.h"
-
-struct Accumulator
-{
-    int16_t data[520];
-};
+#include "accumulator.h"
 
 template <typename W_T, typename B_T, size_t IN, size_t OUT, int SCALE = 64, int32_t MAX = 127>
 struct Layer

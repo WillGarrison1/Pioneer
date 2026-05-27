@@ -24,12 +24,14 @@ class NNUE
     /**
      * Evaluates the given board position using the NNUE
      */
-    float Evaluate(const Board& board) const;
+    float Evaluate(const Board& board, const Accumulator& us, const Accumulator& them) const;
+
 
     /**
      * Evaluates the given board position using the NNUE using only the psqt values (much faster but much less positional information)
      */
-    float FastEvaluate(const Board& board) const;
+    float FastEvaluate(const Board& board, const Accumulator& us, const Accumulator& them) const;
+
 
     /**
      * Adds the contribution of the given index to the accumulator.

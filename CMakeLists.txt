@@ -18,8 +18,9 @@ endif()
 
 add_executable(PioneerV4 ${SOURCES})
 
+file(GLOB NNUE_BIN_FILES "${CMAKE_SOURCE_DIR}/src/nnue/bin/*")
+
 add_custom_command(TARGET PioneerV4 POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        ${CMAKE_SOURCE_DIR}/src/nnue/bin/nnue.bin
-        $<TARGET_FILE_DIR:PioneerV4>/nnue.bin
+    COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:PioneerV4>/nnue_bin
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${NNUE_BIN_FILES} $<TARGET_FILE_DIR:PioneerV4>/nnue_bin
 )
