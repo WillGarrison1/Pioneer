@@ -40,13 +40,17 @@ class NNUE
     /**
      * Removes the contribution of the given index from the accumulator.
      */
-    void Remove(Accumulator& acc, int index) const;
+    void Sub(Accumulator& acc, int index) const;
 
     /**
-     * Updates the accumulator by removing the contribution of the old index and adding the contribution of the new
-     * index.
+     * Adds and subtracts two indexes from the accumulator by removing the contribution of the old index and adding the
+     * contribution of the new index.
      */
-    void Update(Accumulator& acc, int oldIndex, int newIndex) const;
+    void AddSub(Accumulator& acc, int add, int sub) const;
+
+    void AddSubSub(Accumulator& acc, int add, int sub1, int sub2) const;
+
+    void AddAddSubSub(Accumulator& acc, int add1, int add2, int sub1, int sub2) const;
 
     /**
      * Resets the accumulator to the initial state (only biases)

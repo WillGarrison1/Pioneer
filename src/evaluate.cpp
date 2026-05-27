@@ -8,6 +8,8 @@
 #include "nnue/nnue.h"
 #include "profile.h"
 
+// #define USE_HAND_EVAL
+
 #define DEFENDED_BONUS 10    // bonus for defended piece
 #define ATTACKED_PENALTY -15 // penalty for attacked piece
 
@@ -38,13 +40,15 @@ Score EvalPiece(const Board& board)
     const Bitboard defendedW = board.getAttacked(WHITE);
     const Bitboard defendedB = board.getAttacked(BLACK);
 
-    Square piece;
+    score += (popCount(pieceW) - popCount(pieceB)) * pieceScores[P];
 
     score += popCount(pieceW & defendedW) * DEFENDED_BONUS;
     score += popCount(pieceW & defendedB) * ATTACKED_PENALTY;
 
     score -= popCount(pieceB & defendedB) * DEFENDED_BONUS;
     score -= popCount(pieceB & defendedW) * ATTACKED_PENALTY;
+
+    Square piece;
 
     while (pieceW)
     {
@@ -73,7 +77,7 @@ Score EvalPiece<BISHOP>(const Board& board)
     const Bitboard defendedW = board.getAttacked(WHITE);
     const Bitboard defendedB = board.getAttacked(BLACK);
 
-    Square piece;
+    score += (popCount(pieceW) - popCount(pieceB)) * pieceScores[BISHOP];
 
     score += popCount(pieceW & defendedW) * DEFENDED_BONUS;
     score += popCount(pieceW & defendedB) * ATTACKED_PENALTY;
@@ -83,6 +87,8 @@ Score EvalPiece<BISHOP>(const Board& board)
 
     score += (popCount(pieceW) == 2) * BISHOP_PAIR_BONUS;
     score -= (popCount(pieceB) == 2) * BISHOP_PAIR_BONUS;
+
+    Square piece;
 
     while (pieceW)
     {
@@ -215,10 +221,9 @@ Score EvalPiece<PAWN>(const Board& board)
     return score;
 }
 
-template <EvalType type>
-Score Evaluate(Board& board, SearchNode* node)
+template <>
+Score Eval<FULL>(Board& board, SearchNode* node)
 {
-    PROFILE_FUNC();
 
 #ifdef USE_HAND_EVAL
     Score score = EvalPiece<PAWN>(board) + EvalPiece<KNIGHT>(board) + EvalPiece<BISHOP>(board) +
@@ -227,26 +232,34 @@ Score Evaluate(Board& board, SearchNode* node)
     // Add bonus for the amount of squares attacked/defended by each side
     score += (popCount(board.getAttacked(WHITE)) - popCount(board.getAttacked(BLACK))) * REACH_MULTIPLIER;
 
-    score += board.getPawnMaterial() + board.getNonPawnMaterial(); // score material
+    return score * (board.whiteToMove ? 1 : -1);
 #else
 
     Accumulator& us = board.whiteToMove ? node->accumulatorNode.whiteAcc : node->accumulatorNode.blackAcc;
     Accumulator& them = board.whiteToMove ? node->accumulatorNode.blackAcc : node->accumulatorNode.whiteAcc;
 
     node->ComputeAccumulator(board);
-    Score score = nnue->Evaluate(board, us, them);
+    return nnue->Evaluate(board, us, them);
 #endif
-    return score;
-}
-
-template <>
-Score Eval<FULL>(Board& board, SearchNode* node)
-{
-    return Evaluate<FULL>(board, node);
 }
 
 template <>
 Score Eval<FAST>(Board& board, SearchNode* node)
 {
-    return (board.getPawnMaterial() + board.getNonPawnMaterial()) * (board.whiteToMove ? 1 : -1);
+#ifdef USE_HAND_EVAL
+    Score score = EvalPiece<PAWN>(board) + EvalPiece<KNIGHT>(board) + EvalPiece<BISHOP>(board) +
+                  EvalPiece<ROOK>(board) + EvalPiece<QUEEN>(board) + EvalPiece<KING>(board);
+
+    // Add bonus for the amount of squares attacked/defended by each side
+    score += (popCount(board.getAttacked(WHITE)) - popCount(board.getAttacked(BLACK))) * REACH_MULTIPLIER;
+
+    return score * (board.whiteToMove ? 1 : -1);
+#else
+
+    Accumulator& us = board.whiteToMove ? node->accumulatorNode.whiteAcc : node->accumulatorNode.blackAcc;
+    Accumulator& them = board.whiteToMove ? node->accumulatorNode.blackAcc : node->accumulatorNode.whiteAcc;
+
+    node->ComputeAccumulator(board);
+    return nnue->FastEvaluate(board, us, them);
+#endif
 }

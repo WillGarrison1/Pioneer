@@ -29,8 +29,6 @@ BoardState::BoardState()
 
     captured = EMPTY;
     moved = EMPTY;
-    pawn_material = 0;
-    non_pawn_material = 0;
 
     zobristHash = 0ULL;
     repetition = 1;
@@ -46,8 +44,6 @@ BoardState::BoardState(BoardState* prev)
 
     this->castling = prev->castling;
     this->enPassantSquare = SQ_NONE; //* note: only set if en passant can be played
-    this->non_pawn_material = prev->non_pawn_material;
-    this->pawn_material = prev->pawn_material;
     this->zobristHash = prev->zobristHash;
     this->move50rule = prev->move50rule + 1;
 
@@ -137,8 +133,6 @@ void Board::makeMove(Move move, BoardState* newState, DirtyMove& dirtyMove)
 
     // Initialize new board state
     newState->zobristHash = state->zobristHash;
-    newState->pawn_material = state->pawn_material;
-    newState->non_pawn_material = state->non_pawn_material;
     newState->move50rule = state->move50rule + 1;
     newState->castling = state->castling;
 
@@ -259,26 +253,12 @@ void Board::makeMove(Move move, BoardState* newState, DirtyMove& dirtyMove)
             dirtyMove.captured = attacked;
 
             removePieceState(attacked, newState);
-
-            newState->pawn_material -= pieceScores[PAWN] * (whiteToMove ? -1 : 1);
         }
         else if (captured != EMPTY)
         {
             newState->move50rule = 0; // reset 50 move repetition counter on capture
             removePieceState(to, newState);
-
-            PieceType captureType = getType(captured);
             dirtyMove.captured = to;
-
-            switch (captureType)
-            {
-            case PAWN:
-                newState->pawn_material -= pieceScores[PAWN] * (whiteToMove ? -1 : 1);
-                break;
-            default:
-                newState->non_pawn_material -= pieceScores[captureType] * (whiteToMove ? -1 : 1);
-                break;
-            }
         }
 
         if (!move.isType<PROMOTION>())
@@ -292,9 +272,6 @@ void Board::makeMove(Move move, BoardState* newState, DirtyMove& dirtyMove)
             addPieceState(makePiece(promote, color), to, newState);
 
             dirtyMove.promote = makePiece(promote, color);
-
-            newState->pawn_material -= pieceScores[PAWN] * (whiteToMove ? 1 : -1);
-            newState->non_pawn_material += pieceScores[promote] * (whiteToMove ? 1 : -1);
         }
 
         if (pieceType == PAWN)
@@ -564,19 +541,7 @@ void Board::setFen(const std::string& fen, BoardState* newState)
             setBit(pieceBB[pieceType], s);
             setBit(colorBB[color], s);
 
-            board[s] = piece;
-
-            switch (getType(piece))
-            {
-            case PAWN:
-                state->pawn_material += pieceScores[PAWN] * (getColor(piece) == WHITE ? 1 : -1);
-                break;
-            default:
-                state->non_pawn_material += pieceScores[getType(piece)] * (getColor(piece) == WHITE ? 1 : -1);
-                break;
-            }
-
-            s++;
+            board[s++] = piece;
         }
     }
 

@@ -19,10 +19,10 @@ bool NNUE::Load(const std::string& filename)
     // Load using old [520][NUM_FEATURES] layout
     using OldInputLayer = Layer<int16_t, int16_t, NUM_FEATURES, 520, 64, 127, false>;
     auto* temp = new OldInputLayer;
-    params.read(reinterpret_cast<char*>(temp), sizeof(*temp));
+    params.read(reinterpret_cast<char*>(temp->weights), sizeof(temp->weights));
+    params.read(reinterpret_cast<char*>(inputLayer.biases), sizeof(inputLayer.biases));
 
     // Transpose into inputLayer (IS_INPUT=true → weights[NUM_FEATURES][520])
-    std::memcpy(inputLayer.biases, temp->biases, sizeof(inputLayer.biases));
     for (int i = 0; i < 520; i++)
         for (int j = 0; j < NUM_FEATURES; j++)
             inputLayer.weights[j][i] = temp->weights[i][j];
@@ -107,39 +107,74 @@ float NNUE::FastEvaluate(const Board& board, const Accumulator& us, const Accumu
     return psqt * 500.0f / 127.0f;
 }
 
-void NNUE::Add(Accumulator& acc, int index) const
+void NNUE::Add(Accumulator& acc, int add) const
 {
+    const int16_t* addW = inputLayer.weights[add];
     for (int i = 0; i < 512; i++)
     {
-        acc.data[i] += inputLayer.weights[index][i];
+        acc.data[i] += addW[i];
     }
     for (int i = 0; i < 8; i++)
     {
-        acc.psqt[i] += inputLayer.weights[index][i + 512];
+        acc.psqt[i] += addW[i + 512];
     }
 }
 
-void NNUE::Remove(Accumulator& acc, int index) const
+void NNUE::Sub(Accumulator& acc, int sub) const
 {
+    const int16_t* subW = inputLayer.weights[sub];
     for (int i = 0; i < 512; i++)
     {
-        acc.data[i] -= inputLayer.weights[index][i];
+        acc.data[i] -= subW[i];
     }
     for (int i = 0; i < 8; i++)
     {
-        acc.psqt[i] -= inputLayer.weights[index][i + 512];
+        acc.psqt[i] -= subW[i + 512];
     }
 }
 
-void NNUE::Update(Accumulator& acc, int oldIndex, int newIndex) const
+void NNUE::AddSub(Accumulator& acc, int add, int sub) const
 {
+    const int16_t* addW = inputLayer.weights[add];
+    const int16_t* subW = inputLayer.weights[sub];
     for (int i = 0; i < 512; i++)
     {
-        acc.data[i] += inputLayer.weights[newIndex][i] - inputLayer.weights[oldIndex][i];
+        acc.data[i] += addW[i] - subW[i];
     }
     for (int i = 0; i < 8; i++)
     {
-        acc.psqt[i] += inputLayer.weights[newIndex][i + 512] - inputLayer.weights[oldIndex][i + 512];
+        acc.psqt[i] += addW[i + 512] - subW[i + 512];
+    }
+}
+
+void NNUE::AddSubSub(Accumulator& acc, int add, int sub1, int sub2) const
+{
+    const int16_t* addW = inputLayer.weights[add];
+    const int16_t* sub1W = inputLayer.weights[sub1];
+    const int16_t* sub2W = inputLayer.weights[sub2];
+    for (int i = 0; i < 512; i++)
+    {
+        acc.data[i] += addW[i] - sub1W[i] - sub2W[i];
+    }
+    for (int i = 0; i < 8; i++)
+    {
+        acc.psqt[i] += addW[i + 512] - sub1W[i + 512] - sub2W[i + 512];
+    }
+}
+
+void NNUE::AddAddSubSub(Accumulator& acc, int add1, int add2, int sub1, int sub2) const
+{
+    const int16_t* add1W = inputLayer.weights[add1];
+    const int16_t* add2W = inputLayer.weights[add2];
+    const int16_t* sub1W = inputLayer.weights[sub1];
+    const int16_t* sub2W = inputLayer.weights[sub2];
+    for (int i = 0; i < 512; i++)
+    {
+        acc.data[i] += add1W[i] + add2W[i] - sub1W[i] - sub2W[i];
+    }
+    for (int i = 0; i < 8; i++)
+    {
+        acc.psqt[i] += add1W[i + 512] + add2W[i + 512] - sub1W[i + 512] - sub2W[i + 512];
     }
 }
 

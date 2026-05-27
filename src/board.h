@@ -26,8 +26,6 @@ struct BoardState
     Piece captured;
     Piece moved;
 
-    Score pawn_material;
-    Score non_pawn_material;
     CastlingRights castling;       // Castling rights
     Move move;                     // Move that led to this board state
     unsigned char enPassantSquare; // En passant square
@@ -173,16 +171,6 @@ class Board
     inline const BoardState* getState() const
     {
         return state;
-    }
-
-    inline Score getPawnMaterial() const
-    {
-        return state->pawn_material;
-    }
-
-    inline Score getNonPawnMaterial() const
-    {
-        return state->non_pawn_material;
     }
 
     unsigned int getRepetition() const; // gets the amount of times this position appeared on the board

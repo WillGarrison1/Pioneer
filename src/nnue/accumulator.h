@@ -20,13 +20,8 @@ struct DirtyMove
 
 struct Accumulator
 {
-    int16_t data[512];
-    int32_t psqt[8];
-
-    void Add(Square square, Square kingSquare, Piece piece, bool whitePOV);    // adds features
-    void Remove(Square square, Square kingSquare, Piece piece, bool whitePOV); // removes features
-    void Update(Square from, Square to, Square kingSquare, Piece fromPiece, Piece toPiece,
-                bool whitePOV); // substitutes features
+    alignas(64) int16_t data[512];
+    alignas(64) int32_t psqt[8];
 };
 
 struct AccumulatorNode

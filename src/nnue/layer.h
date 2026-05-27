@@ -23,8 +23,8 @@ struct Layer
     static constexpr int32_t max = MAX;
 
     // Layer parameters
-    weight_t weights[row][column];
-    bias_t biases[out_size];
+    alignas(64) weight_t weights[row][column];
+    alignas(64) bias_t biases[out_size];
 
     constexpr int32_t CReLU(int32_t x, int32_t max) const
     {

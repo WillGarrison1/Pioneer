@@ -22,11 +22,7 @@ void SearchNode::ComputeAccumulator(const Board& board)
         lastComputedBlack = lastComputedBlack->prev;
     }
 
-    if (!lastComputedBlack)
-    {
-        std::cerr << "No computed accumulator!" << std::endl;
-        return;
-    }
+    assert(lastComputedBlack);
 
     if (needsFullRefreshBlack)
     {
@@ -74,17 +70,24 @@ void SearchNode::ComputeAccumulator(const Board& board)
                 toPiece = dirtyMove.promote;
             }
 
-            acc.Update(dirtyMove.from, dirtyMove.to, blackKingSquare, fromPiece, toPiece, false);
+            int fromIndex = GetIndex(dirtyMove.from, blackKingSquare, fromPiece, false);
+            int toIndex = GetIndex(dirtyMove.to, blackKingSquare, toPiece, false);
 
             if (dirtyMove.castleFrom != SQ_NONE)
             {
                 Piece rook = makePiece(ROOK, getColor(fromPiece));
-                acc.Update(dirtyMove.castleFrom, dirtyMove.castleTo, blackKingSquare, rook, rook, false);
+                int castleFrom = GetIndex(dirtyMove.castleFrom, blackKingSquare, rook, false);
+                int castleTo = GetIndex(dirtyMove.castleTo, blackKingSquare, rook, false);
+                nnue->AddAddSubSub(acc, toIndex, castleTo, fromIndex, castleFrom);
             }
-
-            if (dirtyMove.capturedPiece != EMPTY)
+            else if (dirtyMove.capturedPiece != EMPTY)
             {
-                acc.Remove(dirtyMove.captured, blackKingSquare, dirtyMove.capturedPiece, false);
+                int captureIndex = GetIndex(dirtyMove.captured, blackKingSquare, dirtyMove.capturedPiece, false);
+                nnue->AddSubSub(acc, toIndex, fromIndex, captureIndex);
+            }
+            else
+            {
+                nnue->AddSub(acc, toIndex, fromIndex);
             }
 
             current = current->prev;
@@ -102,11 +105,7 @@ void SearchNode::ComputeAccumulator(const Board& board)
         lastComputedWhite = lastComputedWhite->prev;
     }
 
-    if (!lastComputedWhite)
-    {
-        std::cerr << "No computed accumulator!" << std::endl;
-        return;
-    }
+    assert(lastComputedWhite);
 
     if (needsFullRefreshWhite)
     {
@@ -140,17 +139,24 @@ void SearchNode::ComputeAccumulator(const Board& board)
                 toPiece = dirtyMove.promote;
             }
 
-            acc.Update(dirtyMove.from, dirtyMove.to, whiteKingSquare, fromPiece, toPiece, true);
+            int fromIndex = GetIndex(dirtyMove.from, whiteKingSquare, fromPiece, true);
+            int toIndex = GetIndex(dirtyMove.to, whiteKingSquare, toPiece, true);
 
             if (dirtyMove.castleFrom != SQ_NONE)
             {
                 Piece rook = makePiece(ROOK, getColor(fromPiece));
-                acc.Update(dirtyMove.castleFrom, dirtyMove.castleTo, whiteKingSquare, rook, rook, true);
+                int castleFrom = GetIndex(dirtyMove.castleFrom, whiteKingSquare, rook, true);
+                int castleTo = GetIndex(dirtyMove.castleTo, whiteKingSquare, rook, true);
+                nnue->AddAddSubSub(acc, toIndex, castleTo, fromIndex, castleFrom);
             }
-
-            if (dirtyMove.capturedPiece != EMPTY)
+            else if (dirtyMove.capturedPiece != EMPTY)
             {
-                acc.Remove(dirtyMove.captured, whiteKingSquare, dirtyMove.capturedPiece, true);
+                int captureIndex = GetIndex(dirtyMove.captured, whiteKingSquare, dirtyMove.capturedPiece, true);
+                nnue->AddSubSub(acc, toIndex, fromIndex, captureIndex);
+            }
+            else
+            {
+                nnue->AddSub(acc, toIndex, fromIndex);
             }
 
             current = current->prev;
