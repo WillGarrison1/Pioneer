@@ -5,14 +5,14 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    add_compile_options(-g -mbmi2)
+    add_compile_options(-Og -mbmi2)
 endif()
 
 
 file(GLOB_RECURSE SOURCES "src/*.cpp")
 
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
-    add_compile_options(-O3 -march=native -mtune=native -flto -fno-exceptions -Wall -Wextra -Wcast-qual -mbmi2 -DNDEBUG -funroll-loops -fno-rtti)
+    add_compile_options(-O3 -march=native -mtune=native -flto -g -fno-exceptions -Wall -Wextra -Wcast-qual -mbmi2 -DNDEBUG -funroll-loops -fno-rtti)
     add_link_options(-flto -static -pthread -lstdc++ -Wl,--no-as-needed)
 endif()
 

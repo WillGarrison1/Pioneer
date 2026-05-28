@@ -423,13 +423,12 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, SearchNo
         if (!fullSearch) // pvs
         {
             int reductions = 0;
-            if (depth >= lmr_depth && i >= lmr_index && !checkMove && move.isType<QUIET>()) // lmr
+            if (depth >= lmr_depth && i >= lmr_index && !inCheck && !checkMove && move.isType<QUIET>()) // lmr
                 reductions = LMRReduction(depth, i);
 
             score = -search<CUTNode>(board, std::max(depth - reductions - 1, 0), ply + 1, -alpha - 1, -alpha, &child);
 
             fullSearch = score > alpha && (isPVNode || reductions != 0 || extension > 0);
-            // line.len = 0; (not sure what this does lol)
         }
 
         if (fullSearch)
@@ -456,7 +455,14 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, SearchNo
                 }
             }
 
-            if (move.isType<QUIET>())
+            if (move.isType<CAPTURE>())
+            {
+                PieceType victimType = getType(board.getSQ(move.to()));
+                if (move.to() == board.getEnPassantSqr())
+                    victimType = PAWN;
+                addCaptureBonus(victimType, move, depth); // add move history bonus
+            }
+            else
             {
                 if (board.getState()->move.getMove() != 0) // don't add for null moves
                     counterMove[board.getState()->move.from()][board.getState()->move.to()] = move;
@@ -464,13 +470,6 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, SearchNo
                 addKillerMove(board.getPly(), move);
                 addHistoryBonus(board.whiteToMove, move, depth); // add move history bonus
                 updateContinuationHistory(board, move, depth, false);
-            }
-            else if (move.isType<CAPTURE>())
-            {
-                PieceType victimType = getType(board.getSQ(move.to()));
-                if (move.to() == board.getEnPassantSqr())
-                    victimType = PAWN;
-                addCaptureBonus(victimType, move, depth); // add move history bonus
             }
 
             for (unsigned int p = moves.GetSize() - i; p < moves.GetSize(); p++)
