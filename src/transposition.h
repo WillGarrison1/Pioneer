@@ -56,11 +56,15 @@ class TranspositionTable
     /**
      * @brief Construct a new Transposition Table object
      *
-     * @param size the size in bytes of the transposition table entry array
+     * @param size the size in kilobytes of the transposition table entry array
      */
-    TranspositionTable(unsigned long long size);
-
+    TranspositionTable(unsigned long kilobytes);
     ~TranspositionTable();
+
+    TranspositionTable(const TranspositionTable&) = delete;
+    TranspositionTable& operator=(const TranspositionTable&) = delete;
+
+    void Resize(unsigned long long bytes);
 
     inline void IncrementAge()
     {
@@ -87,8 +91,6 @@ class TranspositionTable
     unsigned char age;
     unsigned long long numBuckets;
 };
-
-extern TranspositionTable* tTable;
 
 extern Key boardHashes[64][(KING | BLACK) + 1];
 extern Key isBlackHash;

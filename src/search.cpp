@@ -2,6 +2,7 @@
 #include <array>
 #include <cmath>
 #include <cstring>
+#include <format>
 #include <iostream>
 
 #include "search.h"
@@ -29,18 +30,6 @@ constexpr float aspirationMultiplier = 1.5f;
 #define FUTILITY_MARGIN(DEPTH) (80 + 120 * (DEPTH))
 #define DELTA 200
 
-unsigned long long numNodes;
-unsigned long long numQNodes;
-unsigned long long numBetaCutoffs;
-unsigned long long ttHits;
-unsigned long long pvHits;
-unsigned long long orderingNodes;
-unsigned long long maxNodes;
-unsigned long long maxTime;
-unsigned long long startTime;
-
-bool isDone;
-
 constexpr auto lmrTable = [] {
     std::array<std::array<int, 256>, MAX_DEPTH> table{};
     for (int d = 0; d < MAX_DEPTH; d++)
@@ -52,9 +41,6 @@ constexpr auto lmrTable = [] {
     }
     return table;
 }();
-
-Move bestMove = 0;
-Move prevBestMove = 0;
 
 inline bool isWin(Score s)
 {
@@ -76,16 +62,13 @@ inline Score ttToMate(Score s, unsigned char ply)
     return isWin(s) ? s - ply : (isLoss(s) ? s + ply : s);
 }
 
-void UpdatePV(PVLine* line, Move move, PVLine* prev)
+void UpdatePV(PVLine* out, Move move, const PVLine* childLine)
 {
-    prev->moves[0] = move; // leave space for the previous node's move
-    line->len = std::min(line->len, static_cast<uint8_t>(MAX_DEPTH - 2));
-    for (unsigned int i = 0; i < line->len; i++)
-    {
-        prev->moves[i + 1] = line->moves[i];
-    }
-
-    prev->len = line->len + 1;
+    out->moves[0] = move;
+    uint8_t n = std::min(childLine->len, static_cast<uint8_t>(MAX_DEPTH - 2));
+    for (uint8_t i = 0; i < n; i++)
+        out->moves[i + 1] = childLine->moves[i];
+    out->len = n + 1;
 }
 
 /**
@@ -111,19 +94,36 @@ std::string GetMoveListString(PVLine* l)
     return moves;
 }
 
-Score qsearch(Board& board, int ply, Score alpha, Score beta, SearchNode* node)
+Searcher::Searcher() : ttable(64 * 1024), isRunning(false), isQuit(false), thread(std::thread([this] { WorkerLoop(); }))
+{
+}
+
+Searcher::~Searcher()
+{
+    Stop();
+
+    {
+        std::lock_guard lock(mtx);
+        isQuit = true;
+    }
+    cv.notify_all();
+
+    if (thread.joinable())
+        thread.join();
+}
+
+Score Searcher::QSearch(Board& board, int ply, Score alpha, Score beta, SearchNode* node)
 {
     PROFILE_FUNC();
-    numQNodes++;
+    info.numQNodes++;
 
     // probe tt
-
     if (board.getState()->repetition == 3)
         return 0; // draw by repetition
     if (board.getState()->move50rule == 100)
         return 0; // 50-move draw
 
-    TranspositionEntry* entry = tTable->GetEntry(board.getHash());
+    TranspositionEntry* entry = ttable.GetEntry(board.getHash());
     Move bestEntryMove = 0;
     if (entry)
     {
@@ -132,7 +132,7 @@ Score qsearch(Board& board, int ply, Score alpha, Score beta, SearchNode* node)
             (entry->getNodeBound() == NodeBound::Upper && corrected <= alpha) ||
             (entry->getNodeBound() == NodeBound::Lower && corrected >= beta))
         {
-            entry->setAge(tTable->GetAge()); // reset the age for this node
+            entry->setAge(ttable.GetAge()); // reset the age for this node
             return corrected;
         }
 
@@ -191,7 +191,7 @@ Score qsearch(Board& board, int ply, Score alpha, Score beta, SearchNode* node)
 
         SearchNode child(node);
         board.makeMove(m, &state, child.accumulatorNode.dirtyMove);
-        Score score = -qsearch(board, ply + 1, -beta, -alpha, &child);
+        Score score = -QSearch(board, ply + 1, -beta, -alpha, &child);
         board.undoMove();
 
         if (score > pat)
@@ -201,8 +201,8 @@ Score qsearch(Board& board, int ply, Score alpha, Score beta, SearchNode* node)
 
             if (score >= beta)
             {
-                tTable->SetEntry(board.getHash(), mateToTT(score, ply), 0, NodeBound::Lower, m);
-                numBetaCutoffs++;
+                ttable.SetEntry(board.getHash(), mateToTT(score, ply), 0, NodeBound::Lower, m);
+                info.numBetaCutoffs++;
                 return score;
             }
             if (score > alpha)
@@ -212,30 +212,30 @@ Score qsearch(Board& board, int ply, Score alpha, Score beta, SearchNode* node)
         }
     }
     NodeBound bound = (pat >= beta) ? NodeBound::Lower : (pat > originalAlpha) ? NodeBound::Exact : NodeBound::Upper;
-    tTable->SetEntry(board.getHash(), mateToTT(pat, ply), 0, bound, bestM);
+    ttable.SetEntry(board.getHash(), mateToTT(pat, ply), 0, bound, bestM);
 
     return pat;
 }
 
 template <NodeType nodeT>
-Score search(Board& board, int depth, int ply, Score alpha, Score beta, SearchNode* node,
-             const bool nullMoveAllowed = true)
+Score Searcher::Search(Board& board, int depth, int ply, Score alpha, Score beta, SearchNode* node,
+                       const bool nullMoveAllowed)
 {
     constexpr bool isPVNode = nodeT == PVNode || nodeT == RootNode;
     constexpr bool isRootNode = nodeT == RootNode;
 
-    if (isDone)
+    if (!isRunning.load(std::memory_order::memory_order_relaxed))
         return 0;
 
-    if ((numNodes & 2047) == 0 && getTime() - startTime > maxTime)
+    if (getTime() - info.startTime > constraints.movetime)
     {
-        isDone = true;
+        isRunning = false;
         return 0;
     }
 
-    if (numNodes > maxNodes)
+    if (info.numNodes + info.numQNodes > constraints.maxNodes)
     {
-        isDone = true;
+        isRunning = false;
         return 0;
     }
 
@@ -245,62 +245,65 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, SearchNo
     if (!isRootNode && board.getState()->move50rule == 100)
         return 0; // 50 fullmoves have been made
 
-    if (depth == 0)
+    if (depth <= 0)
     {
-        return qsearch(board, ply, alpha, beta, node);
+        return QSearch(board, ply, alpha, beta, node);
     }
 
-    numNodes++;
-    Move bestEntryMove = 0;
-    node->pvLine.len = 0;
-    bool inCheck = board.getNumChecks() > 0;
-
-    if constexpr (isRootNode)
-    {
-        if (prevBestMove.getMove() != 0)
-            bestEntryMove = prevBestMove;
-    }
-
-    TranspositionEntry* entry = tTable->GetEntry(board.getHash());
+    info.numNodes++;
+    TranspositionEntry* entry = nullptr;
     Score ttOrStaticScore = 0; // set below: from TT score if available, otherwise from staticEval
 
-    if (entry)
+    Move bestEntryMove = 0;
+
+    if (isRootNode && info.bestmove.move.getMove() != 0)
     {
-        ttOrStaticScore = ttToMate(entry->score, ply);
-        entry->setAge(tTable->GetAge()); // reset the age for this node
-
-        ttHits++;
-        if constexpr (!isPVNode)
-        {
-            if (entry->depth >= depth)
-            {
-                if ((entry->getNodeBound() == NodeBound::Exact ||
-                     (entry->getNodeBound() == NodeBound::Upper && ttOrStaticScore <= alpha) ||
-                     (entry->getNodeBound() == NodeBound::Lower && ttOrStaticScore >= beta)))
-                {
-                    return ttOrStaticScore;
-                }
-
-                if (entry->getNodeBound() == NodeBound::Lower)
-                    alpha = std::max(alpha, ttOrStaticScore);
-                else if (entry->getNodeBound() == NodeBound::Upper)
-                    beta = std::min(beta, ttOrStaticScore);
-
-                if (alpha >= beta)
-                    return ttOrStaticScore;
-            }
-        }
-
-        bestEntryMove = entry->move;
+        bestEntryMove = info.bestmove.move; // use previous search's best move
     }
-    else if constexpr (!isPVNode)
+    else
     {
+        entry = ttable.GetEntry(board.getHash());
 
-        // Internal Iterative Reduction if no hashmove found (reduce depth by one)
-        depth -= depth > IIR_DEPTH;
+        if (entry)
+        {
+            ttOrStaticScore = ttToMate(entry->score, ply);
+            entry->setAge(ttable.GetAge()); // reset the age for this node
+
+            info.ttHits++;
+            if constexpr (!isPVNode)
+            {
+                if (entry->depth >= depth)
+                {
+                    if ((entry->getNodeBound() == NodeBound::Exact ||
+                         (entry->getNodeBound() == NodeBound::Upper && ttOrStaticScore <= alpha) ||
+                         (entry->getNodeBound() == NodeBound::Lower && ttOrStaticScore >= beta)))
+                    {
+                        return ttOrStaticScore;
+                    }
+
+                    if (entry->getNodeBound() == NodeBound::Lower)
+                        alpha = std::max(alpha, ttOrStaticScore);
+                    else if (entry->getNodeBound() == NodeBound::Upper)
+                        beta = std::min(beta, ttOrStaticScore);
+
+                    if (alpha >= beta)
+                        return ttOrStaticScore;
+                }
+            }
+
+            bestEntryMove = entry->move;
+        }
+        else if constexpr (!isPVNode)
+        {
+
+            // Internal Iterative Reduction if no hashmove found (reduce depth by one)
+            depth -= depth > IIR_DEPTH;
+        }
     }
 
     Score staticEval;
+    bool inCheck = board.getNumChecks() > 0;
+
     if (!inCheck)
         staticEval = Eval<FULL>(board, node);
     else if (node->prev && node->prev->prev)
@@ -322,7 +325,7 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, SearchNo
         if (inCheck)         // if in check, then checkmate
             mateScore = -MATE + ply;
 
-        tTable->SetEntry(board.getHash(), mateToTT(mateScore, ply), depth, NodeBound::Exact, 0);
+        ttable.SetEntry(board.getHash(), mateToTT(mateScore, ply), depth, NodeBound::Exact, 0);
         return mateScore;
     }
 
@@ -344,7 +347,7 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, SearchNo
 
         if (staticEval + margin <= alpha)
         {
-            return qsearch(board, ply, alpha, beta, node);
+            return QSearch(board, ply, alpha, beta, node);
         }
     }
 
@@ -360,13 +363,13 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, SearchNo
 
         SearchNode nullNode(node);
         board.makeNullMove(&state);
-        Score nullScore = -search<CUTNode>(board, newDepth, ply + 1, -beta, -beta + 1, &nullNode);
+        Score nullScore = -Search<CUTNode>(board, newDepth, ply + 1, -beta, -beta + 1, &nullNode);
         board.undoNullMove();
         if (nullScore >= beta)
         {
             // Verification search
             SearchNode verifyNode(node);
-            Score score = search<CUTNode>(board, newDepth, ply + 1, beta - 1, beta, &verifyNode, false);
+            Score score = Search<CUTNode>(board, newDepth, ply + 1, beta - 1, beta, &verifyNode, false);
             if (score >= beta)
                 return nullScore;
             else if (bestEntryMove == 0 && verifyNode.pvLine.len > 0)
@@ -412,9 +415,8 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, SearchNo
 
         SearchNode child(node);
         board.makeMove(move, &state, child.accumulatorNode.dirtyMove);
-        tTable->Prefetch(board.getHash());
+        ttable.Prefetch(board.getHash());
 
-        // Late move reductions (LMR)
         Score score;
         bool fullSearch = i == 0; // always full search the first move
         if (fullSearch)
@@ -422,39 +424,33 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, SearchNo
 
         if (!fullSearch) // pvs
         {
+            // Late move reductions (LMR)
             int reductions = 0;
             if (depth >= lmr_depth && i >= lmr_index && !inCheck && !checkMove && move.isType<QUIET>()) // lmr
                 reductions = LMRReduction(depth, i);
 
-            score = -search<CUTNode>(board, std::max(depth - reductions - 1, 0), ply + 1, -alpha - 1, -alpha, &child);
+            score = -Search<CUTNode>(board, std::max(depth - reductions - 1, 0), ply + 1, -alpha - 1, -alpha, &child);
 
             fullSearch = score > alpha && (isPVNode || reductions != 0 || extension > 0);
         }
 
+        if (!isRunning.load(std::memory_order::memory_order_relaxed))
+            return 0;
+
         if (fullSearch)
         {
             if constexpr (isPVNode)
-                score = -search<PVNode>(board, depth + extension - 1, ply + 1, -beta, -alpha, &child);
+                score = -Search<PVNode>(board, depth + extension - 1, ply + 1, -beta, -alpha, &child);
             else
-                score = -search<CUTNode>(board, depth + extension - 1, ply + 1, -alpha - 1, -alpha, &child);
+                score = -Search<CUTNode>(board, depth + extension - 1, ply + 1, -alpha - 1, -alpha, &child);
         }
         board.undoMove();
 
-        if (isDone)
+        if (!isRunning.load(std::memory_order::memory_order_relaxed))
             return 0;
 
         if (score >= beta)
         {
-            if constexpr (isPVNode)
-            {
-                node->pvLine.moves[0] = move;
-                node->pvLine.len = 1;
-                if (node->pvLine.len > 0)
-                {
-                    UpdatePV(&node->pvLine, move, &node->prev->pvLine);
-                }
-            }
-
             if (move.isType<CAPTURE>())
             {
                 PieceType victimType = getType(board.getSQ(move.to()));
@@ -492,8 +488,8 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, SearchNo
                 }
             }
 
-            tTable->SetEntry(board.getHash(), mateToTT(score, ply), depth, NodeBound::Lower, move);
-            numBetaCutoffs++;
+            ttable.SetEntry(board.getHash(), mateToTT(score, ply), depth, NodeBound::Lower, move);
+            info.numBetaCutoffs++;
             return score;
         }
         if (score > bestS)
@@ -505,80 +501,57 @@ Score search(Board& board, int depth, int ply, Score alpha, Score beta, SearchNo
 
                 if constexpr (isPVNode)
                 {
-                    UpdatePV(&node->pvLine, move, &node->prev->pvLine);
+                    UpdatePV(&node->pvLine, move, &child.pvLine);
                 }
             }
             bestS = score;
             bestM = move;
 
-            if (isRootNode)
+            if constexpr (isRootNode)
             {
-                bestMove = move;
-                std::cout << "info depth " << depth << " best " << bestMove.toString() << " score cp " << score
-                          << " nodes " << numNodes + numQNodes << " pv " << GetMoveListString(&node->prev->pvLine)
+                info.pv = node->pvLine;
+                info.bestmove = {bestM, bestS};
+                std::cout << "info depth " << depth << " best " << bestM.toString() << " score cp " << score
+                          << " nodes " << info.numNodes + info.numQNodes << " pv " << GetMoveListString(&info.pv)
                           << "\n";
             }
         }
     }
 
     if (firstMove == bestM)
-        pvHits++;
+        info.pvHits++;
 
     if (moves.GetSize() >= 2)
-        orderingNodes++;
+        info.orderingNodes++;
 
     if (bestM.getMove() == 0) // if we didn't search a move (futility pruned all moves)
         return staticEval;    // return static evaluation
 
-    if (!isDone) // don't store in transposition table because we cutoff early (Time cutoff, node cutoff, etc.)
-        tTable->SetEntry(board.getHash(), mateToTT(bestS, ply), depth, nodeBound, bestM);
+    if (isRunning.load(std::memory_order::memory_order_relaxed)) // don't store in transposition table if we cutoff
+                                                                 // early (Time cutoff, node cutoff, etc.)
+        ttable.SetEntry(board.getHash(), mateToTT(bestS, ply), depth, nodeBound, bestM);
 
     return bestS;
 }
 
-Score iterativeDeepening(Board& board, unsigned int depth, unsigned int nodes, unsigned int movetime)
+void Searcher::IterativeDeepening(Board& board)
 {
-    startTime = getTime();
-    std::memset(killerMoves, 0, sizeof(killerMoves));
-
-    Score prevBestScore = 0;
-    Score bestScore = -INF;
-
-    prevBestMove = 0;
-    bestMove = 0;
-
-    numNodes = 0;
-    numQNodes = 0;
-    numBetaCutoffs = 0;
-    ttHits = 0;
-    pvHits = 0;
-    orderingNodes = 0;
-
-    if (!movetime)
-        movetime = -1;
-    if (!nodes)
-        nodes = -1;
-    if (!depth)
-        depth = MAX_DEPTH;
-
-    maxTime = movetime;
-    maxNodes = nodes;
-
     SearchNode origin(nullptr);
     board.ResetWhiteAccumulator(origin.accumulatorNode.whiteAcc);
     board.ResetBlackAccumulator(origin.accumulatorNode.blackAcc);
     origin.accumulatorNode.isBlackComputed = origin.accumulatorNode.isWhiteComputed = true;
 
-    for (unsigned int d = 1; d <= depth; d++)
+    RootMove prevBestMove;
+    info.bestmove.score = 0;
+    prevBestMove.score = 0;
+    prevBestMove.move = 0;
+
+    for (unsigned int d = 1; d <= constraints.maxDepth; d++)
     {
-        bestMove = 0;
-        bestScore = -INF;
 
         Score delta = aspirationStartingDelta;
-        Score alpha = prevBestScore - delta;
-        Score beta = prevBestScore + delta;
-
-        Score eval;
+        Score alpha = prevBestMove.score - delta;
+        Score beta = prevBestMove.score + delta;
 
         if (d == 1)
         {
@@ -588,11 +561,11 @@ Score iterativeDeepening(Board& board, unsigned int depth, unsigned int nodes, u
 
         while (true)
         {
-            if (isDone)
+            if (!isRunning.load(std::memory_order::memory_order_relaxed))
                 break;
 
             SearchNode rootNode(&origin);
-            eval = search<RootNode>(board, d, 0, alpha, beta, &rootNode);
+            Score eval = Search<RootNode>(board, d, 0, alpha, beta, &rootNode);
 
             delta *= aspirationMultiplier;
             if (eval > alpha && eval < beta)
@@ -607,62 +580,125 @@ Score iterativeDeepening(Board& board, unsigned int depth, unsigned int nodes, u
             }
         }
 
-        bestScore = eval;
+        std::cout << "info depth " << d << " currmov " << info.bestmove.move.toString() << " score cp "
+                  << info.bestmove.score << " nodes " << info.numNodes + info.numQNodes << " pv "
+                  << GetMoveListString(&info.pv) << "hashfull " << (int)(ttable.GetFull() * 1000) << " time "
+                  << getTime() - info.startTime << " TTHitRate " << (float)info.ttHits / (float)info.numNodes
+                  << " BetaCutRate " << (float)info.numBetaCutoffs / (float)(info.numNodes + info.numQNodes)
+                  << " PVHitRate " << (float)info.pvHits / (float)info.orderingNodes << "\n";
 
-        if (isDone)
+        if (!isRunning.load(std::memory_order::memory_order_relaxed))
         {
-            bestMove = prevBestMove;
-            bestScore = prevBestScore;
-            return prevBestScore;
+            info.bestmove = prevBestMove;
+            break;
         }
 
-        std::cout << "info depth " << d << " currmov " << bestMove.toString() << " score cp " << eval << " nodes "
-                  << numNodes + numQNodes << " pv " << GetMoveListString(&origin.pvLine) << "hashfull "
-                  << (int)(tTable->GetFull() * 1000) << " time " << getTime() - startTime << " TTHitRate "
-                  << (float)ttHits / (float)numNodes << " BetaCutRate "
-                  << (float)numBetaCutoffs / (float)(numNodes + numQNodes) << " PVHitRate "
-                  << (float)pvHits / (float)orderingNodes << "\n";
-
-        prevBestMove = bestMove;
-        prevBestScore = bestScore;
+        prevBestMove = info.bestmove;
     }
-
-    return bestScore;
 }
 
-Move startSearch(Board& board, unsigned int depth, unsigned int nodes, unsigned int movetime,
-                 unsigned int remaining_time)
+void Searcher::ComputeMovetime()
 {
-    isDone = false;
+    if (constraints.remainingTime > 0)
+    {
+        float maxTime = static_cast<float>(constraints.remainingTime) / 25.0f;
+
+        // adjust movetime based on how many roots moves exist
+        if (info.rootMoves.numRoots > 30)
+        {
+            maxTime *= 1.5;
+        }
+        else if (info.rootMoves.numRoots < 10)
+        {
+            maxTime *= 0.75;
+        }
+        else
+        {
+            maxTime *= 0.9;
+        }
+        constraints.movetime = (unsigned int)std::min(maxTime, (float)constraints.remainingTime *
+                                                                   0.2f); // use at most 20% of remaining time
+        if (constraints.movetime == 0)
+            constraints.movetime = 1;
+    }
+    else
+    {
+        constraints.movetime = constraints.movetime == 0 ? UINT_MAX : constraints.movetime;
+    }
+}
+
+void Searcher::DoSearch()
+{
+    info.startTime = getTime();
+    std::memset(killerMoves, 0, sizeof(killerMoves));
+
+    info.rootMoves.Clear();
+    info.bestmove = RootMove{0, 0};
+
+    info.numNodes = 0;
+    info.numQNodes = 0;
+    info.numBetaCutoffs = 0;
+    info.ttHits = 0;
+    info.pvHits = 0;
+    info.orderingNodes = 0;
+
+    constraints.maxDepth = constraints.maxDepth == 0 ? MAX_DEPTH : constraints.maxDepth;
+    constraints.maxNodes = constraints.maxNodes == 0 ? UINT_MAX : constraints.maxNodes;
+    ComputeMovetime();
 
     MoveList mlist;
     board.generateMoves<ALL_MOVES>(&mlist);
 
-    if (remaining_time > 0)
+    for (Move* i = mlist.moves; i < mlist.end; i++)
     {
-        float maxTime = (float)remaining_time / 25.0f;
-
-        if (mlist.GetSize() > 30)
-            maxTime *= 1.5;
-        else if (mlist.GetSize() < 10)
-            maxTime *= 0.75;
-        else
-            maxTime *= 0.9;
-
-        movetime = (unsigned int)std::min(maxTime, (float)remaining_time * 0.2f); // use at most 20% of remaining time
-        if (movetime == 0)
-            movetime = 1;
+        info.rootMoves.Add(RootMove{*i, 0});
     }
 
-    tTable->IncrementAge();
-    Score eval = iterativeDeepening(board, depth, nodes, movetime);
+    ttable.IncrementAge();
+    IterativeDeepening(board);
 
-    if (bestMove.getMove() == 0 && mlist.GetSize() > 0)
+    std::cout << "bestmove " << info.bestmove.move.toString() << std::endl;
+    Stop();
+}
+
+void Searcher::WorkerLoop()
+{
+    while (true)
     {
-        bestMove = mlist[0];
+        {
+            std::unique_lock lock(mtx);
+            cv.wait(lock, [&] { return isRunning == true || isQuit == true; });
+        }
+
+        if (isQuit)
+        {
+            break;
+        }
+
+        DoSearch();
+    }
+}
+
+void Searcher::StartSearch(const Board& board, const SearchConstraints& constraints)
+{
+    if (isRunning.load())
+    {
+        std::cout << "Already searching!" << std::endl;
+        return;
     }
 
-    std::cout << "bestmove " << bestMove.toString() << " score cp " << eval << std::endl;
+    this->board = board;
+    this->constraints = constraints;
 
-    return bestMove;
+    {
+        std::lock_guard lock(mtx);
+        isRunning = true;
+    }
+
+    cv.notify_all();
+}
+
+void Searcher::Stop()
+{
+    isRunning = false;
 }

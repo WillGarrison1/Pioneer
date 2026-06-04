@@ -9,12 +9,12 @@
 #include "movegen.h"
 #include "nnue/nnue.h"
 #include "perft.h"
+#include "platform.h"
 #include "search.h"
 #include "square.h"
 #include "time.h"
 #include "transposition.h"
 #include <cstring>
-#include "platform.h"
 
 Engine::Engine()
 {
@@ -25,7 +25,6 @@ Engine::Engine()
     InitMagics();
 
     std::memset(moveHistory, 0, sizeof(moveHistory));
-
 
     std::string exeDir;
     GetExecutablePath(exeDir);
@@ -38,11 +37,14 @@ Engine::Engine()
 
     board = new Board;
     board->setFen(START_FEN, &states[0]);
+
+    searcher = new Searcher;
 }
 
 Engine::~Engine()
 {
     delete board;
+    delete searcher;
 }
 
 void Engine::makemove(Move move)
@@ -66,7 +68,17 @@ void Engine::makemove(Move move)
 void Engine::go(unsigned int depth, unsigned int nodes, unsigned int movetime, unsigned int wtime, unsigned int btime)
 {
     unsigned int remaining_time = board->whiteToMove ? wtime : btime;
-    startSearch(*board, depth, nodes, movetime, remaining_time);
+    SearchConstraints constraints;
+    constraints.maxDepth = depth;
+    constraints.maxNodes = nodes;
+    constraints.movetime = movetime;
+    constraints.remainingTime = remaining_time;
+    searcher->StartSearch(*board, constraints);
+}
+
+void Engine::stop()
+{
+    searcher->Stop();
 }
 
 void Engine::goPerft(unsigned int depth)

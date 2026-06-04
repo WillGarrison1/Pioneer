@@ -1,5 +1,6 @@
 #include "transposition.h"
 #include "random.h"
+#include <cmath>
 #include <cstring>
 #include <iostream>
 
@@ -7,9 +8,6 @@ alignas(64) Key boardHashes[64][(KING | BLACK) + 1];
 Key isBlackHash;
 Key castleRightsHash[16];
 Key enPassantHash[8];
-
-TranspositionTable* tTable =
-    new (std::align_val_t(64)) TranspositionTable(1024 * 1024 * 64); // transposition table with a size of 64 MB
 
 void TranspositionEntry::Set(Key key, Score score, Move move, unsigned char depth, unsigned char age, NodeBound bound)
 {
@@ -20,22 +18,34 @@ void TranspositionEntry::Set(Key key, Score score, Move move, unsigned char dept
     this->flags = ((unsigned char)bound << 6) | age;
 }
 
-TranspositionTable::TranspositionTable(unsigned long long size)
+TranspositionTable::TranspositionTable(unsigned long kbytes) : buckets(nullptr)
 {
-    assert(size != 0);
-    this->numBuckets =
-        1ULL << (63 - __builtin_clzll(size / sizeof(TranspositionBucket))); // round down to nearest power of two
-    // std::cout << "Num Buckets: " << this->numBuckets << std::endl;
+    assert(kbytes != 0);
+
+    // round down to nearest power of two
+    unsigned long long bytes = (1ULL << static_cast<unsigned long long>(std::floorl(std::log2l(kbytes)))) * 1024ULL;
+    Resize(bytes);
+}
+
+TranspositionTable::~TranspositionTable()
+{
+    operator delete[](this->buckets, std::align_val_t(64));
+}
+
+void TranspositionTable::Resize(unsigned long long bytes)
+{
+    numBuckets = bytes / sizeof(TranspositionBucket);
+    std::cout << "Num Buckets: " << this->numBuckets << " (" << bytes << " bytes)" << std::endl;
+
+    if (this->buckets)
+    {
+        operator delete[](this->buckets, std::align_val_t(64));
+    }
 
     this->buckets = new (std::align_val_t(64)) TranspositionBucket[numBuckets];
     age = 0;
 
     memset(buckets, 0, numBuckets * sizeof(TranspositionBucket));
-}
-
-TranspositionTable::~TranspositionTable()
-{
-    delete[] buckets;
 }
 
 TranspositionEntry* TranspositionTable::GetEntry(Key key)
@@ -51,7 +61,7 @@ TranspositionEntry* TranspositionTable::GetEntry(Key key)
             return entry;
         }
     }
-    
+
     return nullptr;
 }
 

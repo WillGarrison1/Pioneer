@@ -38,16 +38,10 @@ void Interface::run()
             std::cout << "readyok\n";
 
         else if (input == "ucinewgame")
-            tTable->Clear();
+            engine.ClearTT();
 
         else if (input == "d")
             engine.print();
-        else if (word == "tune")
-        {
-            std::string sNum;
-
-            // add variables to tune here
-        }
 
         else if (word == "position")
         {
@@ -141,6 +135,10 @@ void Interface::run()
 
                 engine.go(depth, nodes, movetime, wtime, btime);
             }
+        }
+        else if (word == "stop")
+        {
+            engine.stop();
         }
         else if (word == "makemove")
         {
