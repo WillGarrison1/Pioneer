@@ -4,6 +4,7 @@
 #include <cstring>
 #include <format>
 #include <iostream>
+#include <climits>
 
 #include "search.h"
 
@@ -94,7 +95,9 @@ std::string GetMoveListString(PVLine* l)
     return moves;
 }
 
-Searcher::Searcher() : ttable(64 * 1024), isRunning(false), isQuit(false), thread(std::thread([this] { WorkerLoop(); }))
+Searcher::Searcher()
+    : ttable(64 * 1024), isRunning(false), isSearching(false), isQuit(false),
+      thread(std::thread([this] { WorkerLoop(); }))
 {
 }
 
@@ -434,10 +437,7 @@ Score Searcher::Search(Board& board, int depth, int ply, Score alpha, Score beta
             fullSearch = score > alpha && (isPVNode || reductions != 0 || extension > 0);
         }
 
-        if (!isRunning.load(std::memory_order::memory_order_relaxed))
-            return 0;
-
-        if (fullSearch)
+        if (fullSearch && isRunning.load(std::memory_order::memory_order_relaxed))
         {
             if constexpr (isPVNode)
                 score = -Search<PVNode>(board, depth + extension - 1, ply + 1, -beta, -alpha, &child);
@@ -676,24 +676,26 @@ void Searcher::WorkerLoop()
         }
 
         DoSearch();
+
+        {
+            std::lock_guard lock(mtx);
+            isSearching = false;
+        }
+        cv.notify_all();
     }
 }
 
 void Searcher::StartSearch(const Board& board, const SearchConstraints& constraints)
 {
-    if (isRunning.load())
-    {
-        std::cout << "Already searching!" << std::endl;
-        return;
-    }
+    Stop();
+
+    std::unique_lock lock(mtx);
+    cv.wait(lock, [this] { return !isSearching; });
 
     this->board = board;
     this->constraints = constraints;
-
-    {
-        std::lock_guard lock(mtx);
-        isRunning = true;
-    }
+    isRunning = true;
+    isSearching = true;
 
     cv.notify_all();
 }

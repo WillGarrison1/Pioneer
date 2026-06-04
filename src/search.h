@@ -113,6 +113,7 @@ class Searcher
     TranspositionTable ttable;
 
     std::atomic_bool isRunning;
+    std::atomic_bool isSearching;
     std::atomic_bool isQuit;
     std::condition_variable cv;
     std::mutex mtx;

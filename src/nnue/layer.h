@@ -6,6 +6,7 @@
 
 #include "accumulator.h"
 #include "halfkav2_hm.h"
+#include "../SIMD.h"
 
 template <typename W_T, typename B_T, size_t IN, size_t OUT, int SCALE = 64, int32_t MAX = 127, bool IS_INPUT = false>
 struct Layer
@@ -35,21 +36,21 @@ struct Layer
     {
         static_assert(!isInputLayer, "Cannot call forward on input layer!");
 
-        int8_t us_relu[in_size / 2], them_relu[in_size / 2];
-        for (size_t j = 0; j < in_size / 2; j++)
-        {
-            us_relu[j] = CReLU(us.data[j], max);
-            them_relu[j] = CReLU(them.data[j], max);
-        }
+        alignas(32) int8_t us_relu[in_size / 2];
+        alignas(32) int8_t them_relu[in_size / 2];
 
-        for (size_t i = 0; i < out_size; i++)
+        SIMD::CReLU(us.data, us_relu, max, in_size / 2);
+        SIMD::CReLU(them.data, them_relu, max, in_size / 2);
+
+        for (uint32_t i = 0; i < out_size; i++)
         {
+            const int8_t* __restrict w = weights[i];
+
             int32_t sum = biases[i];
-            for (size_t j = 0; j < in_size / 2; j++)
-            {
-                sum += weights[i][j] * us_relu[j];
-                sum += weights[i][j + in_size / 2] * them_relu[j];
-            }
+            
+            sum += SIMD::dotProduct8(us_relu, w, in_size / 2);
+            sum += SIMD::dotProduct8(them_relu, w + in_size / 2, in_size / 2);
+
             output[i] = (sum + half_scale) / scale; // Round to nearest integer
         }
     }

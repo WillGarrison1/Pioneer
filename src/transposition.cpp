@@ -23,7 +23,7 @@ TranspositionTable::TranspositionTable(unsigned long kbytes) : buckets(nullptr)
     assert(kbytes != 0);
 
     // round down to nearest power of two
-    unsigned long long bytes = (1ULL << static_cast<unsigned long long>(std::floorl(std::log2l(kbytes)))) * 1024ULL;
+    unsigned long long bytes = (1ULL << static_cast<unsigned long long>(std::floor(std::log2l(kbytes)))) * 1024ULL;
     Resize(bytes);
 }
 
