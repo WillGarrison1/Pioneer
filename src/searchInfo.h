@@ -73,15 +73,15 @@ struct SearchInfo
 
 inline void PrintDebugInfo(SearchInfo& info)
 {
-    std::cout << "Total Nodes Searched - " << info.numNodes + info.numQNodes;
-    std::cout << "\n\n----QSearch----\n\n";
+    std::cout << "\nTotal Nodes Searched - " << info.numNodes + info.numQNodes;
+    std::cout << "\n\n----QSearch----\n";
     std::cout << "\nSearched - " << info.numQNodes;
     std::cout << "\nBeta cuts - " << info.numQSearchBetaCutoffs;
     std::cout << "\nTT hits - " << info.ttQSearchHits;
     std::cout << "\nTT cuts - " << info.ttQSearchCuts;
-    std::cout << "\n\n----Search----\n\n";
+    std::cout << "\n\n----Search----\n";
     std::cout << "\nSearched - " << info.numNodes;
-    std::cout << "\n---Beta cuts---";
+    std::cout << "\n\n--Beta cuts--\n";
 
     for (size_t i = 0ull; i < sizeof(info.numSearchBetaCutoffMove) / sizeof(info.numSearchBetaCutoffMove[0]); i++)
     {
@@ -102,10 +102,10 @@ inline void PrintDebugInfo(SearchInfo& info)
     std::cout << "\nPVS Fail Highs - " << info.numPVSFailHigh;
     std::cout << "\nPVS Fail Lows - " << info.numPVSFailLow;
     std::cout << "\nPVS Re-Searches - " << info.numPVSReSearch;
-    std::cout << "\nLMR Reductions - " << info.numLMRReduced;
     std::cout << "\nLMR Fail highs - " << info.numLMRFailHigh;
     std::cout << "\nLMR Fail lows - " << info.numLMRFailLow;
     std::cout << "\nLMR Re-Searches - " << info.numLMRReSearch;
+    std::cout << "\nLMR Reductions - " << info.numLMRReduced;
     std::cout << "\nLMR R=1  - " << info.numLMRReducts[0];
     std::cout << "\nLMR R=2  - " << info.numLMRReducts[1];
     std::cout << "\nLMR R=3  - " << info.numLMRReducts[2];
