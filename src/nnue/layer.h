@@ -36,11 +36,10 @@ struct Layer
     {
         static_assert(!isInputLayer, "Cannot call forward on input layer!");
 
-        alignas(32) int8_t us_relu[in_size / 2];
-        alignas(32) int8_t them_relu[in_size / 2];
+        alignas(32) int8_t sqrCReLU[in_size];
 
-        SIMD::CReLU(us.data, us_relu, max, in_size / 2);
-        SIMD::CReLU(them.data, them_relu, max, in_size / 2);
+        SIMD::SqrCReLU(us.data, sqrCReLU, max, in_size);
+        SIMD::SqrCReLU(them.data, sqrCReLU + in_size / 2, max, in_size);
 
         for (uint32_t i = 0; i < out_size; i++)
         {
@@ -48,8 +47,8 @@ struct Layer
 
             int32_t sum = biases[i];
             
-            sum += SIMD::dotProduct8(us_relu, w, in_size / 2);
-            sum += SIMD::dotProduct8(them_relu, w + in_size / 2, in_size / 2);
+            sum += SIMD::dotProduct8(sqrCReLU, w, in_size / 2);
+            sum += SIMD::dotProduct8(sqrCReLU + in_size / 2, w + in_size / 2, in_size / 2);
 
             output[i] = (sum + half_scale) / scale; // Round to nearest integer
         }
@@ -86,9 +85,5 @@ struct Layer
     }
 };
 
-template <size_t IN, size_t OUT>
-using HiddenLayer = Layer<int8_t, int32_t, IN, OUT>;
-
-using InputLayer = Layer<int16_t, int16_t, NUM_FEATURES, 520, 64, 127, true>;
 
 #endif // LAYER_H

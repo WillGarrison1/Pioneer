@@ -29,7 +29,7 @@ Engine::Engine()
     std::string exeDir;
     GetExecutablePath(exeDir);
     exeDir = exeDir.substr(0, exeDir.find_last_of("/\\"));
-    bool nnueLoaded = nnue->Load(exeDir + "/nnue_bin/nnue01.bin");
+    bool nnueLoaded = nnue->Load(exeDir + "/nnue_bin/nnue02.bin");
     if (!nnueLoaded)
     {
         std::cerr << "Failed to load NNUE network." << std::endl;
@@ -114,11 +114,63 @@ void Engine::eval()
     board->ResetBlackAccumulator(black);
     Accumulator& us = board->whiteToMove ? white : black;
     Accumulator& them = board->whiteToMove ? black : white;
-    Score score = nnue->Evaluate(*board, us, them) * (board->whiteToMove ? 1 : -1);
-    Score psqt = nnue->FastEvaluate(*board, us, them) * (board->whiteToMove ? 1 : -1);
-    std::cout << "Eval: " << score << std::endl;
-    std::cout << "Positional: " << score - psqt << std::endl;
-    std::cout << "Psqt: " << psqt << std::endl;
+    float score = nnue->Evaluate(*board, us, them) * (board->whiteToMove ? 1.0f : -1.0f);
+    float psqt = nnue->FastEvaluate(*board, us, them) * (board->whiteToMove ? 1.0f : -1.0f);
+
+    for (Rank r = RANK_8; r >= RANK_1; r = (Rank)(r - 1))
+    {
+        std::string rank[5] = {"+", "|", "|", "|", "|"};
+        for (File f = FILE_A; f <= FILE_H; f = (File)(f + 1))
+        {
+            Square s = getSquare(f, r);
+            Piece p = board->getSQ(s);
+
+            if (p == EMPTY)
+            {
+                rank[0] += "-------+";
+                rank[1] += "       |";
+                rank[2] += "       |";
+                rank[3] += "       |";
+                rank[4] += "       |";
+                continue;
+            }
+
+            float pieceVal = 0.0f;
+            if (getType(p) != KING)
+            {
+                board->removePiece(s);
+
+                board->ResetWhiteAccumulator(white);
+                board->ResetBlackAccumulator(black);
+                float newScore = nnue->Evaluate(*board, us, them) * (board->whiteToMove ? 1.0f : -1.0f);
+                pieceVal = (score - newScore) / 100;
+
+                board->addPiece(p, s);
+            }
+
+            char buffer[7];
+            std::snprintf(buffer, sizeof(buffer), "%.1f", pieceVal);
+
+            std::string value(buffer);
+            if (value.length() < 7)
+            {
+                int dif = 7 - value.length();
+                int leftZ = std::ceil(dif / 2.0f);
+                int rightZ = std::floor(dif / 2.0f);
+                value.insert(value.begin(), leftZ, ' ');
+                value.insert(value.end(), rightZ, ' ');
+            }
+
+            rank[0] += "-------+";
+            rank[1] += "       |";
+            rank[2] += "   "+pieceToString(p)+"   |";
+            rank[3] += value+"|";
+            rank[4] += "       |";
+        }
+        std::cout << rank[0] << "\n" << rank[1] << "\n" << rank[2] << "\n" << rank[3] << "\n" << rank[4] << "\n";
+    }
+    std::cout << "+-------+-------+-------+-------+-------+-------+-------+-------+\n\n";
+    std::cout << "Positional: " << score - psqt << "\nPsqt: " << psqt << "\n\nEval: " << score << std::endl;
 }
 
 void Engine::isCheck(Move move)

@@ -10,6 +10,7 @@
 #include "board.h"
 #include "move.h"
 #include "movegen.h"
+#include "nnue/accumulatorList.h"
 #include "transposition.h"
 #include "types.h"
 
@@ -58,6 +59,8 @@ struct SearchInfo
     unsigned long long orderingNodes;
     unsigned long long startTime;
 
+    uint8_t seldepth;
+
     RootMoveList rootMoves;
     RootMove bestmove;
     PVLine pv;
@@ -86,6 +89,12 @@ class Searcher
     Searcher();
     ~Searcher();
 
+    void Makemove(Move m, BoardState& state, int ply);
+    void Undomove(int ply);
+
+    void MakeNullmove(BoardState& state, int ply);
+    void UndoNullmove(int ply);
+
     /**
      * @brief Starts a search for the best move and evaluation for a given position
      *
@@ -111,6 +120,7 @@ class Searcher
     SearchInfo info;
     Board board;
     TranspositionTable ttable;
+    AccumulatorList accumulators;
 
     std::atomic_bool isRunning;
     std::atomic_bool isSearching;
@@ -125,9 +135,8 @@ class Searcher
     void IterativeDeepening(Board& board);
 
     template <NodeType nodeT>
-    Score Search(Board& board, int depth, int ply, Score alpha, Score beta, SearchNode* node,
-                 const bool nullMoveAllowed = true);
-    Score QSearch(Board& board, int ply, Score alpha, Score beta, SearchNode* node);
+    Score Search(int depth, int ply, Score alpha, Score beta, SearchNode* node, const bool nullMoveAllowed = true);
+    Score QSearch(int ply, Score alpha, Score beta, SearchNode* node);
 };
 
 #endif

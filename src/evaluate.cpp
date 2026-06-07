@@ -5,6 +5,7 @@
 #include "bitboard.h"
 #include "board.h"
 #include "color.h"
+#include "nnue/accumulatorList.h"
 #include "nnue/nnue.h"
 #include "profile.h"
 
@@ -222,7 +223,7 @@ Score EvalPiece<PAWN>(const Board& board)
 }
 
 template <>
-Score Eval<FULL>(Board& board, SearchNode* node)
+Score Eval<FULL>(Board& board, AccumulatorList& list)
 {
 
 #ifdef USE_HAND_EVAL
@@ -235,16 +236,19 @@ Score Eval<FULL>(Board& board, SearchNode* node)
     return score * (board.whiteToMove ? 1 : -1);
 #else
 
-    Accumulator& us = board.whiteToMove ? node->accumulatorNode.whiteAcc : node->accumulatorNode.blackAcc;
-    Accumulator& them = board.whiteToMove ? node->accumulatorNode.blackAcc : node->accumulatorNode.whiteAcc;
+    list.ComputeAccumulator(board);
 
-    node->ComputeAccumulator(board);
-    return nnue->Evaluate(board, us, them);
+    auto& node = list.Current();
+
+    auto& us = board.whiteToMove ? node.whiteAcc : node.blackAcc;
+    auto& them = board.whiteToMove ? node.blackAcc : node.whiteAcc;
+
+    return std::round(nnue->Evaluate(board, us, them));
 #endif
 }
 
 template <>
-Score Eval<FAST>(Board& board, SearchNode* node)
+Score Eval<FAST>(Board& board, AccumulatorList& list)
 {
 #ifdef USE_HAND_EVAL
     Score score = EvalPiece<PAWN>(board) + EvalPiece<KNIGHT>(board) + EvalPiece<BISHOP>(board) +
@@ -256,10 +260,13 @@ Score Eval<FAST>(Board& board, SearchNode* node)
     return score * (board.whiteToMove ? 1 : -1);
 #else
 
-    Accumulator& us = board.whiteToMove ? node->accumulatorNode.whiteAcc : node->accumulatorNode.blackAcc;
-    Accumulator& them = board.whiteToMove ? node->accumulatorNode.blackAcc : node->accumulatorNode.whiteAcc;
+    list.ComputeAccumulator(board);
 
-    node->ComputeAccumulator(board);
-    return nnue->FastEvaluate(board, us, them);
+    auto& node = list.Current();
+
+    auto& us = board.whiteToMove ? node.whiteAcc : node.blackAcc;
+    auto& them = board.whiteToMove ? node.blackAcc : node.whiteAcc;
+
+    return std::round(nnue->FastEvaluate(board, us, them));
 #endif
 }

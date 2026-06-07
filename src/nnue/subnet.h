@@ -3,6 +3,10 @@
 
 #include "layer.h"
 
+
+template <size_t IN, size_t OUT>
+using HiddenLayer = Layer<int8_t, int32_t, IN, OUT>;
+
 struct Subnet
 {
     HiddenLayer<512 * 2, 16> hidden1;

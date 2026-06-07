@@ -9,6 +9,9 @@
 
 #define NUM_SUBNETS 8
 
+using InputLayer = Layer<int16_t, int16_t, NUM_FEATURES, 1024 + NUM_SUBNETS, 64, 127, true>;
+
+
 class NNUE
 {
   public:
@@ -65,7 +68,7 @@ class NNUE
      */
     float Forward(int subnet, const Accumulator& us, const Accumulator& them) const;
 
-    // transposed so inputLayer is accessed [520][NUM_FEATURES] (so it's optimized for cache)
+    // transposed so inputLayer is accessed [1024 + NUM_SUBNETS][NUM_FEATURES] (so it's optimized for cache)
     InputLayer inputLayer;
     Subnet subnets[NUM_SUBNETS];
 };

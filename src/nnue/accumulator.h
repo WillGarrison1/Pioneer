@@ -20,7 +20,7 @@ struct DirtyMove
 
 struct Accumulator
 {
-    alignas(64) int16_t data[512];
+    alignas(64) int16_t data[1024];
     alignas(64) int32_t psqt[8];
 };
 
@@ -30,6 +30,12 @@ struct AccumulatorNode
 
     bool isWhiteComputed, isBlackComputed;
     DirtyMove dirtyMove;
+
+    AccumulatorNode()
+    {
+        isBlackComputed = isWhiteComputed = false;
+        dirtyMove.movePiece = EMPTY;
+    }
 };
 
 #endif
