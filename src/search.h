@@ -13,57 +13,13 @@
 #include "nnue/accumulatorList.h"
 #include "transposition.h"
 #include "types.h"
+#include "searchInfo.h"
 
 enum NodeType
 {
     PVNode,
     CUTNode,
     RootNode
-};
-
-struct RootMove
-{
-    Move move;
-    Score score;
-};
-
-struct RootMoveList
-{
-    RootMove rootMoves[256];
-    int numRoots;
-
-    inline RootMove& operator[](int index)
-    {
-        assert(index < numRoots);
-        return rootMoves[index];
-    }
-
-    void Add(RootMove rootMove)
-    {
-        rootMoves[numRoots++] = rootMove;
-    }
-
-    void Clear()
-    {
-        numRoots = 0;
-    }
-};
-
-struct SearchInfo
-{
-    unsigned long long numNodes;
-    unsigned long long numQNodes;
-    unsigned long long numBetaCutoffs;
-    unsigned long long ttHits;
-    unsigned long long pvHits;
-    unsigned long long orderingNodes;
-    unsigned long long startTime;
-
-    uint8_t seldepth;
-
-    RootMoveList rootMoves;
-    RootMove bestmove;
-    PVLine pv;
 };
 
 struct SearchConstraints
