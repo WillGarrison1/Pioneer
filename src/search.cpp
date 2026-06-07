@@ -573,6 +573,7 @@ Score Searcher::Search(int depth, int ply, Score alpha, Score beta, SearchNode* 
 
             ttable.SetEntry(board.getHash(), mateToTT(score, ply), depth, NodeBound::Lower, move);
             UPDATE_INFO_BETACUT(info);
+            UPDATE_INFO_BETACUTMOVE(info, i);
             return score;
         }
         if (score > bestS)

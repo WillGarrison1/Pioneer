@@ -41,6 +41,7 @@ struct SearchInfo
 
     unsigned long long numQSearchBetaCutoffs;
     unsigned long long numSearchBetaCutoffs;
+    unsigned long long numSearchBetaCutoffMove[10];
 
     unsigned long long numLMRReduced;
     unsigned long long numLMRFailHigh;
@@ -80,8 +81,22 @@ inline void PrintDebugInfo(SearchInfo& info)
     std::cout << "\nTT cuts - " << info.ttQSearchCuts;
     std::cout << "\n\n----Search----\n\n";
     std::cout << "\nSearched - " << info.numNodes;
-    std::cout << "\nBeta cuts - " << info.numSearchBetaCutoffs;
-    std::cout << "\nTT hits - " << info.ttSearchHits;
+    std::cout << "\n---Beta cuts---";
+
+    for (size_t i = 0ull; i < sizeof(info.numSearchBetaCutoffMove) / sizeof(info.numSearchBetaCutoffMove[0]); i++)
+    {
+        if (i < sizeof(info.numSearchBetaCutoffMove) / sizeof(info.numSearchBetaCutoffMove[0]) - 1ull)
+        {
+            std::cout << "\nMove " << i << " - " << info.numSearchBetaCutoffMove[i];
+        }
+        else
+        {
+            std::cout << "\nMove " << i << "+ - " << info.numSearchBetaCutoffMove[i];
+        }
+    }
+    std::cout << "\nTotal Beta-Cutoffs - " << info.numSearchBetaCutoffs;
+
+    std::cout << "\n\nTT hits - " << info.ttSearchHits;
     std::cout << "\nTT cuts - " << info.ttSearchCuts;
     std::cout << "\nPVS Null Windows - " << info.numPVSZeroWindows;
     std::cout << "\nPVS Fail Highs - " << info.numPVSFailHigh;
@@ -117,6 +132,7 @@ inline void PrintDebugInfo(SearchInfo& info)
 
 #define UPDATE_INFO_QBETACUT(info) info.numQSearchBetaCutoffs++
 #define UPDATE_INFO_BETACUT(info) info.numSearchBetaCutoffs++
+#define UPDATE_INFO_BETACUTMOVE(info, move) info.numSearchBetaCutoffMove[std::min(move, 9)]++;
 
 #define UPDATE_INFO_LMRREDUCE(info) info.numLMRReduced++
 #define UPDATE_INFO_LMRFAILHIGH(info) info.numLMRFailHigh++
@@ -141,6 +157,7 @@ inline void PrintDebugInfo(SearchInfo& info)
 
 #define UPDATE_INFO_QBETACUT(info)
 #define UPDATE_INFO_BETACUT(info)
+#define UPDATE_INFO_BETACUTMOVE(info, move)
 
 #define UPDATE_INFO_LMRREDUCE(info)
 #define UPDATE_INFO_LMRFAILHIGH(info)
