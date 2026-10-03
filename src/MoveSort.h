@@ -7,23 +7,13 @@
 #include "color.h"
 #include "move.h"
 
+#if TUNING
+#include "tuning_params.h"
+#else
+#include "searchParams.h"
+#endif
+
 #include <algorithm>
-
-#define CAPTURE_BONUS 4000
-#define PROMOTION_BONUS 5000
-
-#define MVV_LVA_VICTIM_MULTI 4
-#define MVV_LVA_ATTACKER_MULTI_GOOD 5
-#define MVV_LVA_ATTACKER_MULTI_BAD 1
-
-#define DEFENDED_BONUS 5
-#define ATTACKED_PENALTY -10
-
-#define PV_BONUS 10000
-#define KILLER_MOVE_BONUS 3000
-#define COUNTERMOVE_BONUS 2000
-#define MAX_HISTORY 200
-#define MAX_CAPTURE_HISTORY 300
 
 #define CONTINUATION_HISTORY_SIZE 3
 
@@ -39,8 +29,8 @@ enum SortType
     QUIESCENCE
 };
 
-MoveVal ScoreMove(const Board& board, Move m);
-MoveVal ScoreMoveQ(const Board& board, Move m);
+extern MoveVal ScoreMove(const Board& board, Move m);
+extern MoveVal ScoreMoveQ(const Board& board, Move m);
 
 struct MoveSorter
 {
@@ -126,14 +116,14 @@ inline void updateContinuationHistory(Board& board, Move m, int depth, bool nega
 
 inline void addHistoryBonus(bool isWhite, Move m, int depth)
 {
-    int clampedBonus = std::clamp(depth * depth * depth, -MAX_HISTORY, MAX_HISTORY);
+    int clampedBonus = std::clamp(depth * depth * 50, -MAX_HISTORY, MAX_HISTORY);
     moveHistory[isWhite][m.from()][m.to()] +=
         clampedBonus - moveHistory[isWhite][m.from()][m.to()] * std::abs(clampedBonus) / MAX_HISTORY;
 }
 
 inline void addHistoryPenalty(bool isWhite, Move m, int depth)
 {
-    const int penalty = std::clamp(depth * depth * depth, -MAX_HISTORY, MAX_HISTORY);
+    const int penalty = std::clamp(depth * depth * 50, -MAX_HISTORY, MAX_HISTORY);
     auto gravity = moveHistory[isWhite][m.from()][m.to()] * std::abs(penalty) / MAX_HISTORY;
     moveHistory[isWhite][m.from()][m.to()] -= penalty + gravity;
 }

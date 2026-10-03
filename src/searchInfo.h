@@ -3,8 +3,6 @@
 
 #include "SearchNode.h"
 
-#define SEARCHINFO
-
 struct RootMove
 {
     Move move;
