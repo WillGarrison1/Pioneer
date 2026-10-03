@@ -1,5 +1,6 @@
 #include "transposition.h"
 #include "random.h"
+#include <algorithm>
 #include <cmath>
 #include <cstring>
 #include <iostream>
@@ -114,15 +115,23 @@ void TranspositionTable::SetEntry(Key zobrist, Score score, int depth, NodeBound
 
 float TranspositionTable::GetFull()
 {
+    // Sample the first 1000 buckets rather than scanning the whole table. This is called once per
+    // iterative-deepening iteration purely to print `hashfull`; a full scan of a 64MB table is
+    // ~6M reads per iteration, which measurably cost NPS and evicted useful cache lines.
+    // Sampling is what the UCI `hashfull` field is specified in terms of anyway (permille).
+    const unsigned long long sample = std::min(this->numBuckets, 1000ULL);
+    if (sample == 0)
+        return 0.0f;
+
     unsigned long long valid = 0;
-    for (unsigned long long i = 0; i < this->numBuckets; i++)
+    for (unsigned long long i = 0; i < sample; i++)
     {
         for (TranspositionEntry& e : buckets[i].entries)
             if (e.key)
                 valid++;
     }
 
-    return (float)valid / ((float)numBuckets * BUCKET_SIZE);
+    return (float)valid / ((float)sample * BUCKET_SIZE);
 }
 
 void TranspositionTable::Clear()

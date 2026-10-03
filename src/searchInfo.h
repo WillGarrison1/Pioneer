@@ -73,6 +73,7 @@ struct SearchInfo
 
 inline void PrintDebugInfo(SearchInfo& info)
 {
+    #ifdef SEARCHINFO
     std::cout << "\nTotal Nodes Searched - " << info.numNodes + info.numQNodes;
     std::cout << "\n\n----QSearch----\n";
     std::cout << "\nSearched - " << info.numQNodes;
@@ -122,6 +123,7 @@ inline void PrintDebugInfo(SearchInfo& info)
     }
 
     std::cout << "Best Move: " << info.bestmove.move.toString() << " cp - " << info.bestmove.score << std::endl;
+    #endif
 }
 
 #define UPDATE_INFO_NODES(info) info.numNodes++

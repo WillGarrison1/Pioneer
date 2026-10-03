@@ -6,7 +6,7 @@ alignas(64) int16_t moveHistory[2][64][64];                  // History for [isW
 alignas(64) int16_t captureHistory[64][64][PieceType::KING]; // indexed as [from][to][victimPieceType-1]
 alignas(64) int16_t continuationHistory[CONTINUATION_HISTORY_SIZE][6][64][6][64];
 
-MoveVal ScoreMove(const Board& board, Move m)
+MoveVal ScoreMove(const Board& board, Move m, int ply)
 {
     const Piece piece = board.getSQ(m.from());
     const PieceType pType = getType(piece);
@@ -20,11 +20,11 @@ MoveVal ScoreMove(const Board& board, Move m)
     {
         v.score = pieceScores[getType(m.promotion())] + PROMOTION_BONUS;
     }
-    else if (killerMoves[board.getPly()][0] == m)
+    else if (killerMoves[ply][0] == m)
     {
         v.score = KILLER_MOVE_BONUS;
     }
-    else if (killerMoves[board.getPly()][1] == m)
+    else if (killerMoves[ply][1] == m)
     {
         v.score = KILLER_MOVE_BONUS - 10;
     }
@@ -60,10 +60,7 @@ MoveVal ScoreMoveQ(const Board& board, Move m)
     MoveVal v = {m, 0};
     PieceType pType = getType(board.getSQ(m.from()));
 
-    PieceType victimType = getType(board.getSQ(m.to()));
-
-    if (m.to() == board.getEnPassantSqr())
-        victimType = PAWN;
+    PieceType victimType = CapturedType(board, m);
 
     v.score += 2 * captureHistory[m.from()][m.to()][victimType - 1] + pieceScores[victimType] * 4;
 

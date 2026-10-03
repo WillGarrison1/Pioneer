@@ -39,7 +39,7 @@ enum SortType
     QUIESCENCE
 };
 
-MoveVal ScoreMove(const Board& board, Move m);
+MoveVal ScoreMove(const Board& board, Move m, int ply);
 MoveVal ScoreMoveQ(const Board& board, Move m);
 
 struct MoveSorter
@@ -47,19 +47,24 @@ struct MoveSorter
     MoveVal moveVals[256];
     unsigned int size;
 
-    MoveSorter(const Board& board, MoveList* mlist, Move best) : size(mlist->GetSize())
+    MoveSorter(const Board& board, MoveList* mlist, Move best, int ply) : size(0)
     {
-        for (unsigned int i = 0; i < size; i++)
+
+        while (size < mlist->GetSize())
         {
-            if (mlist->moves[i] == best)
-                moveVals[i] = {best, PV_BONUS};
+            if (mlist->moves[size] == best)
+            {
+                moveVals[size] = moveVals[0];
+                moveVals[0] = {best, PV_BONUS};
+            }
             else
             {
-                if (mlist->moves[i].isType<CAPTURE>())
-                    moveVals[i] = ScoreMoveQ(board, mlist->moves[i]);
+                if (mlist->moves[size].isType<CAPTURE>())
+                    moveVals[size] = ScoreMoveQ(board, mlist->moves[size]);
                 else
-                    moveVals[i] = ScoreMove(board, mlist->moves[i]);
+                    moveVals[size] = ScoreMove(board, mlist->moves[size], ply);
             }
+            size++;
         }
     }
 
@@ -69,14 +74,15 @@ struct MoveSorter
         int bestIndex = 0;
         int bestScore = moveVals[0].score;
 
-        for (unsigned int i = 1; i < size; i++)
-        {
-            if (moveVals[i].score > bestScore)
+        if (bestScore != PV_BONUS) // if the best move is the PV move, return it immediately
+            for (unsigned int i = 1; i < size; i++)
             {
-                bestScore = moveVals[i].score;
-                bestIndex = i;
+                if (moveVals[i].score > bestScore)
+                {
+                    bestScore = moveVals[i].score;
+                    bestIndex = i;
+                }
             }
-        }
 
         MoveVal bestMove = moveVals[bestIndex];
 
@@ -94,7 +100,10 @@ extern int16_t captureHistory[64][64][PieceType::KING]; // same as moveHistory
 extern Move counterMove[64][64];
 extern int16_t continuationHistory[CONTINUATION_HISTORY_SIZE][6][64][6][64];
 
-inline void addKillerMove(unsigned char ply, Move m)
+// `ply` is the SEARCH ply, not board.getPly(). It used to be the latter, narrowed to
+// `unsigned char` on the way in while ScoreMove read the table with the full-width board ply --
+// so past ply 255 the write and read indices diverged and killers silently stopped working.
+inline void addKillerMove(int ply, Move m)
 {
     if (killerMoves[ply][0] == m)
         return;
@@ -150,6 +159,19 @@ inline void addCapturePenalty(PieceType victimType, Move m, int depth)
     const int penalty = std::clamp(depth * depth * depth, -MAX_CAPTURE_HISTORY, MAX_CAPTURE_HISTORY);
     captureHistory[m.from()][m.to()][victimType - 1] -=
         penalty + captureHistory[m.from()][m.to()][victimType - 1] * std::abs(penalty) / MAX_CAPTURE_HISTORY;
+}
+
+/**
+ * @brief The piece type captured by a CAPTURE-typed move.
+ *
+ * En passant is encoded as a plain CAPTURE onto an empty square, so an empty destination
+ * identifies it unambiguously. Testing `m.to() == board.getEnPassantSqr()` instead is wrong:
+ * that is true for *any* piece landing on the en passant square, not just a pawn capturing there.
+ */
+inline PieceType CapturedType(const Board& board, Move m)
+{
+    const Piece victim = board.getSQ(m.to());
+    return victim == EMPTY ? PAWN : getType(victim);
 }
 
 inline Score Mvv_Lva_Score(const Board& board, Move m)

@@ -17,7 +17,7 @@ struct PVLine
 
 struct SearchNode
 {
-    SearchNode()
+    SearchNode() : prev(nullptr)
     {
         staticEval = 0;
         pvLine.len = 0;

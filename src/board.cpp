@@ -231,7 +231,8 @@ void Board::makeMove(Move move, BoardState* newState, DirtyMove& dirtyMove)
             else
                 newState->castling &= ~(CASTLE_BK | CASTLE_BQ);
         }
-        else if (state->castling)
+
+        if (state->castling)
         {
             if (from == SQ_A1 || to == SQ_A1)
                 newState->castling &= ~CASTLE_WQ;
@@ -636,7 +637,7 @@ void Board::ResetBlackAccumulator(Accumulator& blackAcc) const
     }
 }
 
-// Updates attacked bitboard and returns number of checks of the opposing king
+// Updates attacked bitboard
 template <Color side>
 void Board::generateAttackBB()
 {
@@ -699,10 +700,7 @@ Bitboard Board::getAttackers(const Square sqr) const
     attackers |= GetRookMoves(blockers, sqr) & (rooks | queens);
     attackers |= knightMoves[sqr] & knights;
 
-    Direction forward = static_cast<Direction>((side << 1) - 8);
-    attackers |= (shift(sqrToBB(sqr) & ~fileBBs[FILE_A], forward + WEST) |
-                  shift(sqrToBB(sqr) & ~fileBBs[FILE_H], forward + EAST)) &
-                 pawns;
+    attackers |= pawnAttacks[~side][sqr] & pawns;
 
     return attackers;
 }
@@ -783,6 +781,21 @@ bool Board::isCheckMove(Move move)
     const Bitboard enemyKing = getBB(~side, KING);
     Bitboard blockers = getBB(ALL_PIECES);
 
+    // Occupancy as it will look *after* the move, for the direct-check tests below. Using the
+    // current occupancy leaves the moving piece sitting on `from`, so if `from` happens to lie
+    // between `to` and the enemy king the piece appears to block its own check and this returns
+    // a false negative -- e.g. Rf1-h1 against a king on a1 reads f1 as an obstruction.
+    // The revealed-check section further down builds its own occupancy and is unaffected.
+    Bitboard afterBlockers = blockers;
+    clearBit(afterBlockers, move.from());
+    setBit(afterBlockers, to);
+    if (move.type() == CASTLE) // the rook also moves; it lands between king origin and target
+    {
+        clearBit(afterBlockers,
+                 (getFile(to) == FILE_G) ? (side == WHITE ? SQ_H1 : SQ_H8) : (side == WHITE ? SQ_A1 : SQ_A8));
+        setBit(afterBlockers, static_cast<Square>((move.from() + to) >> 1));
+    }
+
     const Direction dir = directionsTable[to][lsb(enemyKing)];
     // check for direct checks
 
@@ -799,16 +812,16 @@ bool Board::isCheckMove(Move move)
     case BISHOP:
         if ((dir == SOUTH_EAST || dir == SOUTH_WEST || dir == NORTH_WEST ||
              dir == NORTH_EAST) && // if diagonal and no blockers in the way
-            !(bitboardPaths[to][lsb(enemyKing)] & blockers & ~enemyKing))
+            !(bitboardPaths[to][lsb(enemyKing)] & afterBlockers & ~enemyKing))
             return true;
         break;
     case ROOK:
         if ((dir == SOUTH || dir == WEST || dir == NORTH || dir == EAST) && // if straight and no blockers in the way
-            !(bitboardPaths[to][lsb(enemyKing)] & blockers & ~enemyKing))
+            !(bitboardPaths[to][lsb(enemyKing)] & afterBlockers & ~enemyKing))
             return true;
         break;
     case QUEEN:
-        if (dir && !(bitboardPaths[to][lsb(enemyKing)] & blockers &
+        if (dir && !(bitboardPaths[to][lsb(enemyKing)] & afterBlockers &
                      ~enemyKing)) // if there's a direction and no blockers in the way
             return true;
         break;
@@ -821,7 +834,7 @@ bool Board::isCheckMove(Move move)
             if (!rookDir) // if there is no direction from where the rook is
                 return false;
 
-            Bitboard ray = GetRookMoves(blockers, rookPos);
+            Bitboard ray = GetRookMoves(afterBlockers, rookPos);
             if (ray & enemyKing)
                 return true;
         }

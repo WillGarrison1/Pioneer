@@ -49,6 +49,8 @@ Engine::~Engine()
 
 void Engine::makemove(Move move)
 {
+    quiesceSearch();
+
     MoveList legal;
     board->generateMoves<ALL_MOVES>(&legal);
 
@@ -65,15 +67,129 @@ void Engine::makemove(Move move)
     }
 }
 
-void Engine::go(unsigned int depth, unsigned int nodes, unsigned int movetime, unsigned int wtime, unsigned int btime)
+void Engine::go(const GoParams& params)
 {
-    unsigned int remaining_time = board->whiteToMove ? wtime : btime;
-    SearchConstraints constraints;
-    constraints.maxDepth = depth;
-    constraints.maxNodes = nodes;
-    constraints.movetime = movetime;
-    constraints.remainingTime = remaining_time;
+    SearchConstraints constraints{};
+    constraints.maxDepth = params.depth;
+    constraints.maxNodes = params.nodes;
+    constraints.movetime = params.movetime;
+    constraints.remainingTime = board->whiteToMove ? params.wtime : params.btime;
+    constraints.increment = board->whiteToMove ? params.winc : params.binc;
+    constraints.movesToGo = params.movestogo;
+    constraints.infinite = params.infinite;
+    constraints.quiet = false;
     searcher->StartSearch(*board, constraints);
+}
+
+void Engine::SetHashSize(unsigned int megabytes)
+{
+    if (megabytes == 0)
+        return;
+    searcher->ResizeTT(static_cast<unsigned long long>(megabytes) * 1024ULL * 1024ULL);
+}
+
+// Standard bench set. Kept fixed on purpose: the node total is only meaningful as a regression
+// signal if the positions never change.
+static const char* BENCH_FENS[] = {
+    "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+    "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1",
+    "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1",
+    "r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1",
+    "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8",
+    "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10",
+    "2rq1rk1/pp1bppbp/3p1np1/8/3NP3/1BN1BP2/PPPQ2PP/2KR3R w - - 0 1",
+    "4rrk1/pp1n1pp1/2pb1q1p/3p4/3P1B2/2PB1N2/PPQ2PPP/R4RK1 w - - 0 1",
+    "8/8/1P6/5pr1/8/4R3/7k/2K5 w - - 0 1",
+    "6k1/5ppp/8/8/8/8/5PPP/2R3K1 w - - 0 1",
+    "8/k7/3p4/p2P1p2/P2P1P2/8/8/K7 w - - 0 1",
+    "r1bqkb1r/pp3ppp/2n1pn2/2pp4/3P1B2/2PBP3/PP1N1PPP/R2QK1NR w KQkq - 0 1",
+};
+
+void Engine::bench(unsigned int depth)
+{
+    quiesceSearch();
+
+    if (depth == 0)
+        depth = 12;
+
+    unsigned long long totalNodes = 0;
+    const unsigned long long start = getTime();
+
+    for (const char* fen : BENCH_FENS)
+    {
+        // Clear between positions so the total does not depend on carry-over TT state.
+        searcher->ClearTT();
+        board->setFen(fen, &states[0]);
+
+        SearchConstraints constraints{};
+        constraints.maxDepth = depth;
+        constraints.quiet = true;
+
+        searcher->StartSearch(*board, constraints);
+        searcher->WaitForSearch();
+
+        const SearchInfo& info = searcher->GetSearchInfo();
+        totalNodes += info.numNodes + info.numQNodes;
+    }
+
+    const unsigned long long elapsed = getTime() - start;
+    const unsigned long long nps = totalNodes * 1000ULL / std::max(elapsed, 1ULL);
+
+    // Trailing format is what OpenBench parses.
+    std::cout << "Bench depth " << depth << " time " << elapsed << " ms\n";
+    std::cout << totalNodes << " nodes " << nps << " nps" << std::endl;
+
+    board->setFen(START_FEN, &states[0]);
+}
+
+// Standard perft positions with published node counts.
+struct PerftCase
+{
+    const char* fen;
+    unsigned int depth;
+    unsigned long long expected;
+};
+
+static const PerftCase PERFT_CASES[] = {
+    {"rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", 5, 4865609ULL},
+    {"r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1", 4, 4085603ULL},
+    {"8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1", 6, 11030083ULL},
+    {"r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1", 5, 15833292ULL},
+    {"rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8", 5, 89941194ULL},
+    {"r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10", 5, 164075551ULL},
+    // Castling-rights regression. White's Kxa8 captures a corner rook, which must clear BLACK's
+    // queenside right. makeMove() used to update rook-square rights in an `else if` hung off the
+    // king-move branch, so a king capture skipped it entirely, and castle generation trusted the
+    // rights bit without checking the rook was there -- together they generated a queenside
+    // castle onto an empty corner, corrupting the bitboards and the zobrist key.
+    // Verified: the pre-fix build reports 53141 here (79 illegal castling nodes), the fixed
+    // build 53062.
+    {"r3k2r/1K6/8/8/8/8/8/8 w kq - 0 1", 5, 53062ULL},
+};
+
+bool Engine::perftSuite()
+{
+    quiesceSearch();
+
+    bool allPassed = true;
+    const unsigned long long start = getTime();
+
+    for (const PerftCase& c : PERFT_CASES)
+    {
+        board->setFen(c.fen, &states[0]);
+        const unsigned long long got = perft(*board, c.depth);
+        const bool ok = (got == c.expected);
+        allPassed &= ok;
+
+        std::cout << (ok ? "PASS " : "FAIL ") << "depth " << c.depth << "  got " << got << "  expected " << c.expected
+                  << "  " << c.fen << "\n";
+    }
+
+    std::cout << (allPassed ? "perftsuite: ALL PASSED" : "perftsuite: FAILURES PRESENT") << " ("
+              << (getTime() - start) << " ms)" << std::endl;
+
+    board->setFen(START_FEN, &states[0]);
+    return allPassed;
 }
 
 void Engine::stop()
@@ -83,6 +199,8 @@ void Engine::stop()
 
 void Engine::goPerft(unsigned int depth)
 {
+    quiesceSearch();
+
     unsigned long long start = getTime();
     unsigned long long moveCount = 0;
 
@@ -109,6 +227,8 @@ void Engine::goPerft(unsigned int depth)
 
 void Engine::eval()
 {
+    quiesceSearch();
+
     Accumulator white, black;
     board->ResetWhiteAccumulator(white);
     board->ResetBlackAccumulator(black);
@@ -181,10 +301,14 @@ void Engine::isCheck(Move move)
     for (Move* mPtr = legal.moves; mPtr < legal.end; mPtr++)
     {
         Move m = *mPtr;
-        if (m.to() == move.to() && m.from() == move.from() && m.promotion() == move.promotion())
+        // Match the way makemove() does. Comparing promotion() unconditionally silently failed
+        // for castling: the generated castle move encodes EMPTY in the promotion bits, which
+        // reads back as QUEEN, so `check e1g1` matched nothing and printed nothing at all.
+        if (m.to() == move.to() && m.from() == move.from() &&
+            ((m.type() == PROMOTION && move.promotion() == m.promotion()) || (m.type() != PROMOTION)))
         {
             std::cout << board->isCheckMove(m) << std::endl;
-            break;
+            return;
         }
     }
 }

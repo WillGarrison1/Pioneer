@@ -1,5 +1,9 @@
 /build/
+/build-pgo/
+/build-pgo-plain/
+/build-assert/
 /.vscode/
+/tools/__pycache__
 /out
 /tune
 /CMakePresets*

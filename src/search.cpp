@@ -20,6 +20,13 @@
 
 #define FUTILITY_DEPTH 4
 
+// Hard ceiling on search ply. `ply` is NOT bounded by `depth`: a check extension keeps depth
+// constant while ply still increments, so a forcing sequence can climb indefinitely. The
+// accumulator array holds exactly MAX_DEPTH nodes and Makemove() writes index ply+1, so without
+// this cap a long check sequence writes past the end of that allocation. Leave headroom for the
+// qsearch that runs on top of the deepest main-search ply.
+constexpr int PLY_LIMIT = MAX_DEPTH - 8;
+
 constexpr int lmr_index = 2; // the first index lmr will be used on
 constexpr int lmr_depth = 2; // the minimum depth lmr can be used
 
@@ -61,6 +68,23 @@ inline Score mateToTT(Score s, unsigned char ply)
 inline Score ttToMate(Score s, unsigned char ply)
 {
     return isWin(s) ? s - ply : (isLoss(s) ? s + ply : s);
+}
+
+/**
+ * @brief Formats a score as a UCI `score` field.
+ *
+ * Mate scores were previously reported as raw centipawns (e.g. "score cp 30995"), which no GUI or
+ * tournament manager interprets as a mate. UCI wants "score mate <N>", N in *moves*, negative
+ * when we are the one getting mated.
+ */
+std::string ScoreToUCI(Score s)
+{
+    if (isWin(s))
+        return "score mate " + std::to_string((MATE - s + 1) / 2);
+    if (isLoss(s))
+        return "score mate " + std::to_string(-((MATE + s + 1) / 2));
+
+    return "score cp " + std::to_string(s);
 }
 
 void UpdatePV(PVLine* out, Move move, const PVLine* childLine)
@@ -150,7 +174,18 @@ Score Searcher::QSearch(int ply, Score alpha, Score beta, SearchNode* node)
     PROFILE_FUNC();
     UPDATE_INFO_QNODES(info);
 
-    // 50 move and 3 fold draws are checked before QSearch is called
+    if (!isRunning.load(std::memory_order::memory_order_relaxed))
+        return 0;
+
+    // QSearch recurses into itself and never re-enters Search, so these have to be repeated here.
+    // The draw checks in particular matter: when in check we generate ALL_MOVES (including quiets),
+    // so a perpetual-check sequence has no other terminating condition.
+    if (board.getState()->repetition >= 3)
+        return 0;
+
+    // See PLY_LIMIT: nothing else bounds `ply`, and exceeding it is an out-of-bounds write.
+    if (ply >= PLY_LIMIT)
+        return board.getNumChecks() ? 0 : Eval<FULL>(board, accumulators);
 
     TranspositionEntry* entry = ttable.GetEntry(board.getHash());
     Move bestEntryMove = 0;
@@ -202,7 +237,7 @@ Score Searcher::QSearch(int ply, Score alpha, Score beta, SearchNode* node)
         pat = -MATE; // in check
     }
 
-    MoveSorter sorter(board, &moves, bestEntryMove);
+    MoveSorter sorter(board, &moves, bestEntryMove, ply);
 
     Move bestM = 0;
     BoardState state;
@@ -258,7 +293,9 @@ Score Searcher::Search(int depth, int ply, Score alpha, Score beta, SearchNode* 
     if (!isRunning.load(std::memory_order::memory_order_relaxed))
         return 0;
 
-    if (getTime() - info.startTime > constraints.movetime)
+    // Sample the clock every 2048 nodes rather than at every node: getTime() was previously
+    // called once per node, which is pure overhead on the hottest path in the engine.
+    if ((info.numNodes & 2047ULL) == 0 && getTime() - info.startTime > hardLimit)
     {
         isRunning = false;
         return 0;
@@ -270,11 +307,15 @@ Score Searcher::Search(int depth, int ply, Score alpha, Score beta, SearchNode* 
         return 0;
     }
 
-    if (!isRootNode && board.getState()->repetition == 3)
+    if (!isRootNode && board.getState()->repetition >= 3)
         return 0; // draw by repetition
 
-    if (!isRootNode && board.getState()->move50rule == 100)
-        return 0; // 50 fullmoves have been made
+    // Note: the 50-move draw is tested after move generation below, because a mate delivered on
+    // the 100th ply takes precedence over the draw and that needs the legal move count.
+
+    // See PLY_LIMIT: nothing else bounds `ply`, and exceeding it is an out-of-bounds write.
+    if (ply >= PLY_LIMIT)
+        return board.getNumChecks() ? 0 : Eval<FULL>(board, accumulators);
 
     if (depth <= 0)
     {
@@ -369,6 +410,13 @@ Score Searcher::Search(int depth, int ply, Score alpha, Score beta, SearchNode* 
         return mateScore;
     }
 
+    // 50-move draw. Tested here rather than at node entry because checkmate on the 100th ply
+    // beats the draw, and that is only knowable once we have a legal move count (handled by the
+    // mate/stalemate block above, which runs first). `>=` rather than `==`: the counter is only
+    // sampled at nodes we visit, so an exact comparison can be stepped over entirely.
+    if (!isRootNode && board.getState()->move50rule >= 100)
+        return 0;
+
     // reverse futility pruning
     if (!isPVNode && !inCheck && depth <= 8)
     {
@@ -407,19 +455,17 @@ Score Searcher::Search(int depth, int ply, Score alpha, Score beta, SearchNode* 
         UndoNullmove(ply);
         if (nullScore >= beta)
         {
-            // Verification search
+            // Verification search. The null move was already undone above, so this re-searches
+            // the *current* position and must use `ply`, not `ply + 1` -- mate scores round-trip
+            // through mateToTT/ttToMate keyed on ply, so an off-by-one here corrupts them.
             SearchNode verifyNode(node);
-            Score score = Search<CUTNode>(newDepth, ply + 1, beta - 1, beta, &verifyNode, false);
+            Score score = Search<CUTNode>(newDepth, ply, beta - 1, beta, &verifyNode, false);
             if (score >= beta)
                 return nullScore;
-            else if (bestEntryMove == 0 && verifyNode.pvLine.len > 0)
-            {
-                bestEntryMove = verifyNode.pvLine.moves[0];
-            }
         }
     }
 
-    MoveSorter sorter(board, &moves, bestEntryMove);
+    MoveSorter sorter(board, &moves, bestEntryMove, ply);
 
     Score bestS = -INF;
     Move bestM = 0;
@@ -536,17 +582,14 @@ Score Searcher::Search(int depth, int ply, Score alpha, Score beta, SearchNode* 
         {
             if (move.isType<CAPTURE>())
             {
-                PieceType victimType = getType(board.getSQ(move.to()));
-                if (move.to() == board.getEnPassantSqr())
-                    victimType = PAWN;
-                addCaptureBonus(victimType, move, depth); // add move history bonus
+                addCaptureBonus(CapturedType(board, move), move, depth); // add move history bonus
             }
             else
             {
                 if (board.getState()->move.getMove() != 0) // don't add for null moves
                     counterMove[board.getState()->move.from()][board.getState()->move.to()] = move;
 
-                addKillerMove(board.getPly(), move);
+                addKillerMove(ply, move);
                 addHistoryBonus(board.whiteToMove, move, depth); // add move history bonus
                 updateContinuationHistory(board, move, depth, false);
             }
@@ -564,10 +607,7 @@ Score Searcher::Search(int depth, int ply, Score alpha, Score beta, SearchNode* 
                 }
                 else if (penaltyMove.isType<CAPTURE>())
                 {
-                    PieceType victimType = getType(board.getSQ(penaltyMove.to()));
-                    if (penaltyMove.to() == board.getEnPassantSqr())
-                        victimType = PAWN;
-                    addCapturePenalty(victimType, penaltyMove, depth);
+                    addCapturePenalty(CapturedType(board, penaltyMove), penaltyMove, depth);
                 }
             }
 
@@ -596,13 +636,16 @@ Score Searcher::Search(int depth, int ply, Score alpha, Score beta, SearchNode* 
                 info.pv = node->pvLine;
                 info.bestmove = {bestM, bestS};
 
-                uint64_t time = getTime() - info.startTime;
-                uint64_t nodes = info.numNodes + info.numQNodes;
-                uint64_t nps = nodes * 1000 / std::max(time, 1ull);
+                if (!constraints.quiet)
+                {
+                    uint64_t time = getTime() - info.startTime;
+                    uint64_t nodes = info.numNodes + info.numQNodes;
+                    uint64_t nps = nodes * 1000 / std::max(time, 1ull);
 
-                std::cout << "info depth " << depth << " best " << bestM.toString() << " score cp " << score << " time "
-                          << time << " nodes " << info.numNodes + info.numQNodes << " nps " << nps << " pv "
-                          << GetMoveListString(&info.pv) << "\n";
+                    std::cout << "info depth " << depth << " currmove " << bestM.toString() << " "
+                              << ScoreToUCI(score) << " time " << time << " nodes " << nodes << " nps " << nps
+                              << " pv " << GetMoveListString(&info.pv) << std::endl;
+                }
             }
         }
     }
@@ -613,8 +656,11 @@ Score Searcher::Search(int depth, int ply, Score alpha, Score beta, SearchNode* 
     if (moves.GetSize() >= 2)
         UPDATE_INFO_ORDERHIT(info);
 
-    if (bestM.getMove() == 0) // if we didn't search a move (futility pruned all moves)
-        return staticEval;    // return static evaluation
+    // Every move was pruned (futility/LMP). staticEval is unrelated to the window and can sit
+    // above alpha, which would report a bound we never established; alpha is the correct
+    // fail-low value here.
+    if (bestM.getMove() == 0)
+        return alpha;
 
     if (isRunning.load(std::memory_order::memory_order_relaxed)) // don't store in transposition table if we cutoff
                                                                  // early (Time cutoff, node cutoff, etc.)
@@ -639,7 +685,9 @@ void Searcher::IterativeDeepening(Board& board)
     prevBestMove.score = 0;
     prevBestMove.move = 0;
 
-    for (unsigned int d = 1; d <= constraints.maxDepth; d++)
+    // d < MAX_DEPTH, not <=: lmrTable is indexed [depth][moveNum] with MAX_DEPTH rows, so
+    // searching at depth == MAX_DEPTH (reachable via `go depth 256`) reads off the end of it.
+    for (unsigned int d = 1; d <= constraints.maxDepth && d < MAX_DEPTH; d++)
     {
         info.seldepth = 0;
 
@@ -674,14 +722,17 @@ void Searcher::IterativeDeepening(Board& board)
             }
         }
 
-        uint64_t time = getTime() - info.startTime;
-        uint64_t nodes = info.numNodes + info.numQNodes;
-        uint64_t nps = nodes * 1000 / std::max(time, 1ull);
+        if (!constraints.quiet)
+        {
+            uint64_t time = getTime() - info.startTime;
+            uint64_t nodes = info.numNodes + info.numQNodes;
+            uint64_t nps = nodes * 1000 / std::max(time, 1ull);
 
-        std::cout << "info depth " << d << " seldepth " << info.seldepth + 1 << " currmov "
-                  << info.bestmove.move.toString() << " score cp " << info.bestmove.score << " nodes " << nodes
-                  << " time " << time << " nps " << nps << " hashfull " << (int)(ttable.GetFull() * 1000) << " pv "
-                  << GetMoveListString(&info.pv) << "\n";
+            std::cout << "info depth " << d << " seldepth " << info.seldepth + 1 << " currmove "
+                      << info.bestmove.move.toString() << " " << ScoreToUCI(info.bestmove.score) << " nodes " << nodes
+                      << " time " << time << " nps " << nps << " hashfull " << (int)(ttable.GetFull() * 1000) << " pv "
+                      << GetMoveListString(&info.pv) << std::endl;
+        }
 
         if (!isRunning.load(std::memory_order::memory_order_relaxed))
         {
@@ -690,37 +741,82 @@ void Searcher::IterativeDeepening(Board& board)
         }
 
         prevBestMove = info.bestmove;
+
+        // Soft limit: this iteration completed, but there is not enough time left to make a
+        // meaningful start on the next one. Stopping here rather than at the hard limit is what
+        // keeps the engine from burning its whole budget on an iteration it cannot finish.
+        if (getTime() - info.startTime >= softLimit)
+            break;
     }
 }
 
 void Searcher::ComputeMovetime()
 {
-    if (constraints.remainingTime > 0)
-    {
-        float maxTime = static_cast<float>(constraints.remainingTime) / 25.0f;
+    constexpr unsigned long long NO_LIMIT = ~0ULL;
 
-        // adjust movetime based on how many roots moves exist
-        if (info.rootMoves.numRoots > 30)
-        {
-            maxTime *= 1.5;
-        }
-        else if (info.rootMoves.numRoots < 10)
-        {
-            maxTime *= 0.75;
-        }
-        else
-        {
-            maxTime *= 0.9;
-        }
-        constraints.movetime = (unsigned int)std::min(maxTime, (float)constraints.remainingTime *
-                                                                   0.2f); // use at most 20% of remaining time
-        if (constraints.movetime == 0)
-            constraints.movetime = 1;
+    // `go infinite` -- run until an explicit `stop`.
+    if (constraints.infinite)
+    {
+        softLimit = hardLimit = NO_LIMIT;
+        return;
+    }
+
+    // `go movetime N` -- spend exactly N, no soft cutoff.
+    if (constraints.movetime > 0)
+    {
+        softLimit = hardLimit = constraints.movetime;
+        return;
+    }
+
+    // No clock information at all (e.g. `go depth N` / `go nodes N` / bench).
+    if (constraints.remainingTime == 0)
+    {
+        softLimit = hardLimit = NO_LIMIT;
+        return;
+    }
+
+    // Reserve a small buffer so we never flag on the way back through the GUI.
+    constexpr unsigned long long OVERHEAD = 20;
+    const unsigned long long remaining =
+        constraints.remainingTime > OVERHEAD ? constraints.remainingTime - OVERHEAD : 1;
+    const unsigned long long inc = constraints.increment;
+
+    unsigned long long soft;
+    if (constraints.movesToGo > 0)
+    {
+        // Fixed number of moves until the next control: divide what's left, plus most of the
+        // increment we are guaranteed to get back.
+        soft = remaining / std::max(constraints.movesToGo, 1u) + (inc * 3) / 4;
     }
     else
     {
-        constraints.movetime = constraints.movetime == 0 ? UINT_MAX : constraints.movetime;
+        // Sudden death or increment-only. The increment term is the important part: at a control
+        // like 8+0.08 the base share alone is a small fraction of what we can actually afford,
+        // and ignoring the increment (as this previously did) throws away most of the budget.
+        soft = remaining / 20 + (inc * 3) / 4;
     }
+
+    // Widen or narrow slightly by how many root moves there are -- a near-forced position does
+    // not need the full share.
+    if (info.rootMoves.numRoots > 30)
+        soft = soft * 3 / 2;
+    else if (info.rootMoves.numRoots < 10)
+        soft = soft * 3 / 4;
+
+    // The hard limit is what an in-progress iteration may not exceed. Never commit more than a
+    // fraction of the clock to a single move regardless of what the increment suggests.
+    unsigned long long hard = std::min(remaining * 2 / 5, soft * 5);
+
+    soft = std::min(soft, hard);
+
+    // The soft limit gates *starting* another iteration, and each iteration costs roughly 1.5-2x
+    // the previous one. Comparing raw elapsed against the full budget therefore overshoots badly:
+    // an iteration begun at 99% of budget still runs to completion. Starting only while under
+    // ~3/5 of the budget keeps the typical move close to its share.
+    soft = soft * 3 / 5;
+
+    softLimit = std::max(soft, 1ULL);
+    hardLimit = std::max(hard, 1ULL);
 }
 
 void Searcher::DoSearch()
@@ -748,8 +844,11 @@ void Searcher::DoSearch()
     ttable.IncrementAge();
     IterativeDeepening(board);
 
-    std::cout << "bestmove " << info.bestmove.move.toString() << std::endl;
-    PrintDebugInfo(info);
+    if (!constraints.quiet)
+    {
+        std::cout << "bestmove " << info.bestmove.move.toString() << std::endl;
+        PrintDebugInfo(info);
+    }
     Stop();
 }
 
@@ -795,4 +894,29 @@ void Searcher::StartSearch(const Board& board, const SearchConstraints& constrai
 void Searcher::Stop()
 {
     isRunning = false;
+}
+
+void Searcher::WaitForSearch()
+{
+    std::unique_lock lock(mtx);
+    cv.wait(lock, [this] { return !isSearching; });
+}
+
+void Searcher::ResizeTT(unsigned long long bytes)
+{
+    // Never reallocate under a live search -- the worker holds raw entry pointers.
+    Stop();
+    WaitForSearch();
+
+    unsigned long long targetBuckets = bytes / sizeof(TranspositionBucket);
+    if (targetBuckets == 0)
+        targetBuckets = 1;
+
+    // Round down to a power of two: GetEntry/SetEntry index with `key & (numBuckets - 1)`, which
+    // only distributes correctly when numBuckets is a power of two.
+    unsigned long long pow2 = 1;
+    while (pow2 <= targetBuckets / 2)
+        pow2 *= 2;
+
+    ttable.Resize(pow2 * sizeof(TranspositionBucket));
 }

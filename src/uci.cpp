@@ -21,9 +21,14 @@ void Interface::run()
     std::string word;
     while (true)
     {
-        std::getline(std::cin, input);
+        // Check the stream, not just the contents: on EOF getline fails without ever matching
+        // "quit", which previously left this loop spinning on empty input forever.
+        if (!std::getline(std::cin, input))
+            break;
+
         std::stringstream parse(input);
 
+        word.clear();
         parse >> word;
 
         if (input == "quit")
@@ -32,16 +37,46 @@ void Interface::run()
         else if (input == "uci")
             std::cout << "id name PioneerV4.1\n"
                       << "id author Pioneer\n"
-                      << "uciok\n";
+                      << "option name Hash type spin default 64 min 1 max 4096\n"
+                      << "uciok" << std::endl;
+
+        else if (word == "setoption")
+        {
+            // setoption name <id> [value <x>]
+            std::string name, value;
+            parse >> word; // "name"
+            if (word == "name")
+            {
+                while (parse >> word && word != "value")
+                    name += (name.empty() ? "" : " ") + word;
+                if (word == "value")
+                    while (parse >> word)
+                        value += (value.empty() ? "" : " ") + word;
+            }
+
+            if (name == "Hash")
+                engine.SetHashSize(atoi(value.c_str()));
+        }
 
         else if (input == "isready")
-            std::cout << "readyok\n";
+            std::cout << "readyok" << std::endl; // must flush: stdout is block-buffered on a pipe
 
         else if (input == "ucinewgame")
             engine.ClearTT();
 
         else if (input == "d")
             engine.print();
+
+        else if (word == "bench")
+        {
+            unsigned int depth = 0; // 0 -> default
+            if (parse >> word)
+                depth = atoi(word.c_str());
+            engine.bench(depth);
+        }
+
+        else if (word == "perftsuite")
+            engine.perftSuite();
 
         else if (word == "position")
         {
@@ -99,41 +134,56 @@ void Interface::run()
             }
             else
             {
-                int depth = 0;
-                int nodes = 0;
-                int movetime = 0;
-                int wtime = 0;
-                int btime = 0;
+                GoParams p{};
                 do
                 {
                     if (word == "depth")
                     {
                         parse >> word;
-                        depth = atoi(word.c_str());
+                        p.depth = atoi(word.c_str());
                     }
                     else if (word == "movetime")
                     {
                         parse >> word;
-                        movetime = atoi(word.c_str());
+                        p.movetime = atoi(word.c_str());
                     }
                     else if (word == "nodes")
                     {
                         parse >> word;
-                        nodes = atoi(word.c_str());
+                        p.nodes = atoi(word.c_str());
                     }
                     else if (word == "wtime")
                     {
                         parse >> word;
-                        wtime = atoi(word.c_str());
+                        p.wtime = atoi(word.c_str());
                     }
                     else if (word == "btime")
                     {
                         parse >> word;
-                        btime = atoi(word.c_str());
+                        p.btime = atoi(word.c_str());
+                    }
+                    else if (word == "winc")
+                    {
+                        parse >> word;
+                        p.winc = atoi(word.c_str());
+                    }
+                    else if (word == "binc")
+                    {
+                        parse >> word;
+                        p.binc = atoi(word.c_str());
+                    }
+                    else if (word == "movestogo")
+                    {
+                        parse >> word;
+                        p.movestogo = atoi(word.c_str());
+                    }
+                    else if (word == "infinite")
+                    {
+                        p.infinite = true;
                     }
                 } while (parse >> word);
 
-                engine.go(depth, nodes, movetime, wtime, btime);
+                engine.go(p);
             }
         }
         else if (word == "stop")

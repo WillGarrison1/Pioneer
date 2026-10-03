@@ -440,19 +440,28 @@ void generateCastlingMoves(const Board& board, MoveList* list)
 
     const Bitboard open = ~(blockers | board.getAttacked(~color));
 
+    // The rook-presence tests below are a cheap invariant, not redundancy. Castling rights are
+    // maintained incrementally in makeMove(); if that bookkeeping ever misses a case, castling
+    // here would call movePieceState() on an empty corner square and silently corrupt the
+    // bitboards and the zobrist key. Verifying the rook is actually there contains that class
+    // of bug to a missed castle instead of a broken board.
+    const Bitboard ourRooks = board.getBB(color, ROOK);
+
     if constexpr (color == WHITE)
     {
         // Short castle
-        if ((castleRights & CASTLE_WK) &&                          // has castle right
-            (open & castleBBs[CASTLE_WK]) == castleBBs[CASTLE_WK]) // no obstructions between king and rook
+        if ((castleRights & CASTLE_WK) &&                           // has castle right
+            (open & castleBBs[CASTLE_WK]) == castleBBs[CASTLE_WK] && // no obstructions between king and rook
+            (ourRooks & sqrToBB(SQ_H1)))                             // rook actually present
         {
             list->addMove(Move(SQ_E1, SQ_G1, CASTLE, EMPTY));
         }
         // Long castle
         if ((castleRights & CASTLE_WQ) && // has castle right
             ((open & castleBBs[CASTLE_WQ]) ==
-             castleBBs[CASTLE_WQ]) &&            // no attacked squares or pieces where king moves through
-            (blockers & sqrToBB(SQ_B1)) == 0ULL) // no piecce next to rook
+             castleBBs[CASTLE_WQ]) &&             // no attacked squares or pieces where king moves through
+            (blockers & sqrToBB(SQ_B1)) == 0ULL && // no piecce next to rook
+            (ourRooks & sqrToBB(SQ_A1)))           // rook actually present
         {
             list->addMove(Move(SQ_E1, SQ_C1, CASTLE, EMPTY));
         }
@@ -460,13 +469,14 @@ void generateCastlingMoves(const Board& board, MoveList* list)
     else
     {
         // Short castle
-        if ((castleRights & CASTLE_BK) && ((open & castleBBs[CASTLE_BK]) == castleBBs[CASTLE_BK]))
+        if ((castleRights & CASTLE_BK) && ((open & castleBBs[CASTLE_BK]) == castleBBs[CASTLE_BK]) &&
+            (ourRooks & sqrToBB(SQ_H8)))
         {
             list->addMove(Move(SQ_E8, SQ_G8, CASTLE, EMPTY));
         }
         // Long castle
         if ((castleRights & CASTLE_BQ) && ((open & castleBBs[CASTLE_BQ]) == castleBBs[CASTLE_BQ]) &&
-            (blockers & sqrToBB(SQ_B8)) == 0ULL)
+            (blockers & sqrToBB(SQ_B8)) == 0ULL && (ourRooks & sqrToBB(SQ_A8)))
         {
             list->addMove(Move(SQ_E8, SQ_C8, CASTLE, EMPTY));
         }
