@@ -8,7 +8,6 @@ Pioneer is a free UCI chess engine written from scratch in C++. It is heavily in
 * Aspiration Windows
 * Iterative Deepening
 * Quiescence Search
-* Internal Iterative Deepening
 ### Pruning
 * Futility Pruning
 * Null Move Pruning
@@ -16,6 +15,7 @@ Pioneer is a free UCI chess engine written from scratch in C++. It is heavily in
 * Reverse Futility Pruning
 * Delta Pruning
 * Transposition Table
+* Late Move Pruning
 ### Extensions/Reductions
 * Late Move Reductions
 * Internal Iterative Reductions
@@ -28,7 +28,9 @@ Pioneer is a free UCI chess engine written from scratch in C++. It is heavily in
 * Counter Moves
 * MVV LVA
 * Hash Move
+* Piece Square Tables
 ## Evaluation
+### HCE [Depricated]
 * Material Score
 * Piece Square Tables
 * Passed Pawns
@@ -38,4 +40,10 @@ Pioneer is a free UCI chess engine written from scratch in C++. It is heavily in
 * Bishop Pair
 * Attacked King-Adjacent Squares
 
-As of now, my evaluation is lacking the most. I'm working on replacing my evaluation with an NNUE :D
+### NNUE
+* Architecture;
+  * (22528)x2 -> (1024+8)x2 -> (512)x2 -> 16 -> 32 -> 1
+  * 8 subnets
+  * 8 psqt bonuses
+* SIMD accelerated
+* Lazily Updated Accumulators
