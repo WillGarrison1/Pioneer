@@ -14,12 +14,21 @@ makes the USE stage silently find no profile and produce a plain -O3 binary.
 
 Usage:
     python tools/pgo_build.py [--build-dir build-pgo] [--depth 13] [--compare]
+                              [--cxx clang++] [--cc clang] [--profdata llvm-profdata]
 
 --compare additionally builds a plain Release binary and benches both, so you can see what PGO
 actually bought on your machine rather than assuming.
+
+--cxx / --cc pick the compiler. The same compiler is used for the GENERATE, USE and plain
+stages: mixing compilers between stages makes the profile unusable, and comparing PGO against a
+plain build from a different compiler measures the compiler, not PGO. If the build dir was
+configured with a different compiler, it is wiped first, since CMake can't switch compilers
+in an existing cache.
 """
 
 import argparse
+import os
+import re
 import shutil
 import subprocess
 import sys
@@ -36,6 +45,71 @@ def run(cmd, **kw):
         print(f"command failed with exit {r.returncode}")
         sys.exit(r.returncode)
     return r
+
+
+def resolve_tool(name, what):
+    """Resolve a compiler/tool name or path to an absolute path, or exit."""
+    p = shutil.which(name)
+    if not p:
+        print(f"{what} '{name}' not found (not on PATH and not a valid path)")
+        sys.exit(1)
+    return str(Path(p).resolve())
+
+
+def same_path(a, b):
+    return os.path.normcase(os.path.realpath(a)) == os.path.normcase(os.path.realpath(b))
+
+
+def cached_cxx(build_dir):
+    """The C++ compiler an existing build dir was configured with, or None."""
+    cache = build_dir / "CMakeCache.txt"
+    if not cache.exists():
+        return None
+    for line in cache.read_text(errors="replace").splitlines():
+        if line.startswith("CMAKE_CXX_COMPILER:"):
+            return line.split("=", 1)[1].strip()
+    return None
+
+
+def ensure_compiler(build_dir, cxx):
+    """Wipe build_dir if it was configured with a different C++ compiler."""
+    if cxx is None:
+        return
+    old = cached_cxx(build_dir)
+    if old and not same_path(old, cxx):
+        print(f"  {build_dir.name} was configured with {old}; wiping it to switch to {cxx}")
+        shutil.rmtree(build_dir)
+
+
+def compiler_flags(cc, cxx):
+    flags = []
+    if cc:
+        flags.append(f"-DCMAKE_C_COMPILER={cc}")
+    if cxx:
+        flags.append(f"-DCMAKE_CXX_COMPILER={cxx}")
+    return flags
+
+
+def find_profdata(explicit, cxx):
+    """
+    llvm-profdata must match the clang version that wrote the .profraw files, so prefer an
+    explicit --profdata, then one sitting next to the chosen clang (including versioned names
+    like clang++-18 -> llvm-profdata-18), then whatever is on PATH.
+    """
+    if explicit:
+        return resolve_tool(explicit, "llvm-profdata")
+
+    if cxx:
+        cdir = Path(cxx).parent
+        m = re.search(r"clang\+\+(-\d+)?", Path(cxx).stem)
+        suffix = m.group(1) if m and m.group(1) else ""
+        for name in (f"llvm-profdata{suffix}", "llvm-profdata"):
+            for ext in ("", ".exe"):
+                p = cdir / (name + ext)
+                if p.exists():
+                    return str(p)
+
+    return shutil.which("llvm-profdata")
 
 
 def configure(build_dir, pgo_stage, generator, extra=None):
@@ -99,16 +173,31 @@ def main():
                     help="bench depth used as the training workload")
     ap.add_argument("--jobs", type=int, default=8)
     ap.add_argument("--generator", default="MinGW Makefiles")
+    ap.add_argument("--cxx", default=None,
+                    help="C++ compiler name or path (e.g. g++, clang++, clang++-18); "
+                         "default: whatever CMake picks")
+    ap.add_argument("--cc", default=None,
+                    help="C compiler name or path; only needed if the project enables C")
+    ap.add_argument("--profdata", default=None,
+                    help="llvm-profdata to merge clang profiles with; default: next to "
+                         "--cxx, then PATH")
     ap.add_argument("--compare", action="store_true",
                     help="also build plain Release and report the speedup")
     ap.add_argument("--clean", action="store_true",
                     help="delete the build dir first (recommended if flags changed)")
     args = ap.parse_args()
 
+    cxx = resolve_tool(args.cxx, "C++ compiler") if args.cxx else None
+    cc = resolve_tool(args.cc, "C compiler") if args.cc else None
+    cflags = compiler_flags(cc, cxx)
+    if cxx:
+        print(f"using C++ compiler: {cxx}")
+
     build_dir = (ROOT / args.build_dir).resolve()
     if args.clean and build_dir.exists():
         print(f"removing {build_dir}")
         shutil.rmtree(build_dir)
+    ensure_compiler(build_dir, cxx)
 
     # Stale counters from an earlier run would be merged into this one, so clear them.
     # GCC writes .gcda next to each object file; Clang writes .profraw into pgo-data.
@@ -119,7 +208,7 @@ def main():
         f.unlink()
 
     print("\n[1/3] building instrumented binary (-fprofile-generate)")
-    configure(build_dir, "GENERATE", args.generator)
+    configure(build_dir, "GENERATE", args.generator, cflags)
     build(build_dir, args.jobs)
 
     print("\n[2/3] training")
@@ -136,14 +225,15 @@ def main():
     # Clang needs an explicit merge step; GCC's .gcda files are consumed directly.
     if profiles[0].suffix == ".profraw":
         merged = pgo_data / "pioneer.profdata"
-        llvm_profdata = shutil.which("llvm-profdata")
+        llvm_profdata = find_profdata(args.profdata, cxx)
         if not llvm_profdata:
             print("  llvm-profdata not found but clang .profraw files were produced.")
+            print("  pass --profdata pointing at the one that ships with your clang.")
             sys.exit(1)
         run([llvm_profdata, "merge", f"-output={merged}"] + [str(p) for p in profiles])
 
     print("\n[3/3] rebuilding optimized (-fprofile-use)")
-    configure(build_dir, "USE", args.generator)
+    configure(build_dir, "USE", args.generator, cflags)
     # Capture build output: a "profile count data file not found" warning means the USE stage
     # is running blind, which makes the binary slower than plain Release.
     r = subprocess.run(["cmake", "--build", str(build_dir), "-j", str(args.jobs)],
@@ -160,7 +250,8 @@ def main():
     if args.compare:
         plain_dir = (ROOT / (args.build_dir + "-plain")).resolve()
         print("\n[compare] building plain Release")
-        configure(plain_dir, "OFF", args.generator)
+        ensure_compiler(plain_dir, cxx)
+        configure(plain_dir, "OFF", args.generator, cflags)
         build(plain_dir, args.jobs)
         base_nodes, base_nps = run_bench(engine_path(plain_dir), args.depth, "plain Release")
 

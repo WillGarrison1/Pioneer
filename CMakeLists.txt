@@ -12,7 +12,7 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    add_compile_options(-Og -mbmi2 -mssse3)
+    add_compile_options(-g -mbmi2 -mssse3)
 endif()
 
 
@@ -71,8 +71,8 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
                 # PGO builds, on the same kind of workload -- preferred over guessing.
                 # -fprofile-correction: tolerate counter inconsistencies from threaded execution.
                 # -Wmissing-profile is left on deliberately: a missing profile makes PGO a net loss.
-                add_compile_options(-fprofile-use ${PIONEER_PGO_EXTRA})
-                add_link_options(-fprofile-use ${PIONEER_PGO_EXTRA})
+                add_compile_options(-fprofile-use -fno-peel-loops -fno-tracer -fprofile-correction ${PIONEER_PGO_EXTRA})
+                add_link_options(-fprofile-use -fno-peel-loops -fno-tracer -fprofile-correction ${PIONEER_PGO_EXTRA})
             endif()
 
         elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")

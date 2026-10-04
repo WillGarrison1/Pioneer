@@ -42,7 +42,6 @@ constexpr float aspirationMultiplier = 1.5f;
 
 #define NULL_DEPTH 3
 #define IIR_DEPTH 3 // internal iterative reduction depth
-#define FUTILITY_MARGIN(DEPTH) (80 + 120 * (DEPTH))
 #define DELTA 200
 
 constexpr auto lmrTable = [] {
@@ -249,10 +248,13 @@ Score Searcher::QSearch(int ply, Score alpha, Score beta, SearchNode* node)
     Move bestM = 0;
     BoardState state;
 
-    while (sorter.size)
+    while (true)
     {
         Move m = sorter.Next();
-
+        if (m.getMove() == 0)
+        {
+            break;
+        }
         // Delta pruning
         if (!board.getNumChecks() && !m.isType<PROMOTION>())
         {
@@ -481,9 +483,14 @@ Score Searcher::Search(int depth, int ply, Score alpha, Score beta, SearchNode* 
     Move firstMove = 0;
     int lmpCount = 0;
     const int lmpThreshold = LMP_OFFSET + LMP_MULTI * depth * depth;
-    for (int i = 0; sorter.size != 0; i++)
+
+    for (int i = 0;; i++)
     {
         Move move = sorter.Next();
+        if (move.getMove() == 0)
+        {
+            break; // end of moves
+        }
 
         if (!isPVNode && !inCheck && move.isType<QUIET>())
         {
@@ -537,8 +544,9 @@ Score Searcher::Search(int depth, int ply, Score alpha, Score beta, SearchNode* 
 
             fullSearch = score > alpha && (isPVNode || reductions != 0 || extension > 0);
             if (fullSearch)
+            {
                 UPDATE_INFO_PVSRESEARCH(info);
-
+            }
             if (reductions > 0)
             {
                 UPDATE_INFO_LMRREDUCE(info);
@@ -603,7 +611,7 @@ Score Searcher::Search(int depth, int ply, Score alpha, Score beta, SearchNode* 
 
             for (unsigned int p = moves.GetSize() - i; p < moves.GetSize(); p++)
             {
-                Move penaltyMove = sorter.moveVals[p].m;
+                Move penaltyMove = sorter.moves[p].m;
                 if (penaltyMove == move)
                     continue;
 
@@ -649,20 +657,23 @@ Score Searcher::Search(int depth, int ply, Score alpha, Score beta, SearchNode* 
                     uint64_t nodes = info.numNodes + info.numQNodes;
                     uint64_t nps = nodes * 1000 / std::max(time, 1ull);
 
-                    std::cout << "info depth " << depth << " currmove " << bestM.toString() << " "
-                              << ScoreToUCI(score) << " time " << time << " nodes " << nodes << " nps " << nps
-                              << " pv " << GetMoveListString(&info.pv) << std::endl;
+                    std::cout << "info depth " << depth << " currmove " << bestM.toString() << " " << ScoreToUCI(score)
+                              << " time " << time << " nodes " << nodes << " nps " << nps << " pv "
+                              << GetMoveListString(&info.pv) << std::endl;
                 }
             }
         }
     }
 
     if (firstMove == bestM)
+    {
         UPDATE_INFO_PVHIT(info);
+    }
 
     if (moves.GetSize() >= 2)
+    {
         UPDATE_INFO_ORDERHIT(info);
-
+    }
     // Every move was pruned (futility/LMP). staticEval is unrelated to the window and can sit
     // above alpha, which would report a bound we never established; alpha is the correct
     // fail-low value here.
@@ -854,10 +865,10 @@ void Searcher::DoSearch()
     if (!constraints.quiet)
     {
         std::cout << "bestmove " << info.bestmove.move.toString() << std::endl;
-        
-        #ifdef SEARCHINFO
-    PrintDebugInfo(info);
-    #endif
+
+#ifdef SEARCHINFO
+        PrintDebugInfo(info);
+#endif
     }
 
     Stop();
