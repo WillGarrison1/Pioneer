@@ -1,0 +1,32 @@
+#pragma once
+
+constexpr int LMR_INDEX = 3;
+constexpr int LMR_DEPTH = 4;
+constexpr int IIR_DEPTH = 1;
+constexpr int FUTILITY_DEPTH = 6;
+constexpr int RAZORING_DEPTH = 5;
+constexpr int NULL_DEPTH = 2;
+constexpr int NULL_MOVE_DEPTH_OFFSET = 0;
+constexpr int REVERSE_FUTILITY_MAX_DEPTH = 6;
+constexpr int NULL_MOVE_VERIFY_DEPTH = 14;
+constexpr float LMR_DIVISOR = 2.8813;
+constexpr float LMR_OFFSET = 1.6313;
+constexpr float ASPIRATION_STARTING_DELTA = 48.9396;
+constexpr float ASPIRATION_MULTIPLIER = 1.6894;
+constexpr float FUTILITY_MULTI = 107.3736;
+constexpr float FUTILITY_OFFSET = 111.5660;
+constexpr float REVERSE_FUTILITY_MULTI = 151.5660;
+constexpr float RAZORING_OFFSET = 378.9151;
+constexpr float RAZORING_MULTI = 131.5660;
+constexpr float NULL_MOVE_DEPTH_MULTI = 0.4583;
+constexpr float LMP_MULTI = 2.7892;
+constexpr float LMP_OFFSET = 2.0000;
+constexpr float DELTA = 263.1321;
+constexpr int CAPTURE_BONUS = 6843;
+constexpr int PROMOTION_BONUS = 11843;
+constexpr int ATTACKED_PENALTY = -3167;
+constexpr int PV_BONUS = 31001;
+constexpr int KILLER_MOVE_BONUS = 16843;
+constexpr int COUNTERMOVE_BONUS = 0;
+constexpr int MAX_HISTORY = 10657;
+constexpr int MAX_CAPTURE_HISTORY = 5657;

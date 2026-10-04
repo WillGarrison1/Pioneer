@@ -15,9 +15,16 @@
 #include "time.h"
 #include "transposition.h"
 
+#ifdef TUNING
+#include "tuning_params.h"
+#else
+#include "searchParams.h"
+#endif
+
 #define INF 32000
 #define MATE 31000
 
+#define FUTILITY_MARGIN(DEPTH) (FUTILITY_OFFSET + FUTILITY_MULTI * (DEPTH))
 #define FUTILITY_DEPTH 4
 
 // Hard ceiling on search ply. `ply` is NOT bounded by `depth`: a check extension keeps depth
@@ -44,7 +51,7 @@ constexpr auto lmrTable = [] {
     {
         for (int m = 0; m < 256; m++)
         {
-            table[d][m] = 0.75f + std::log(d > 0 ? d : 1) * std::log(m > 0 ? m : 1) / 2.25f;
+            table[d][m] = LMR_OFFSET + std::log(d > 0 ? d : 1) * std::log(m > 0 ? m : 1) / LMR_DIVISOR;
         }
     }
     return table;
@@ -418,9 +425,9 @@ Score Searcher::Search(int depth, int ply, Score alpha, Score beta, SearchNode* 
         return 0;
 
     // reverse futility pruning
-    if (!isPVNode && !inCheck && depth <= 8)
+    if (!isPVNode && !inCheck && depth <= REVERSE_FUTILITY_MAX_DEPTH)
     {
-        Score margin = 120 * depth;
+        Score margin = REVERSE_FUTILITY_MULTI * depth;
 
         if (staticEval - margin >= beta)
         {
@@ -429,9 +436,9 @@ Score Searcher::Search(int depth, int ply, Score alpha, Score beta, SearchNode* 
     }
 
     // razoring
-    if (!isPVNode && !inCheck && depth <= 3)
+    if (!isPVNode && !inCheck && depth <= RAZORING_DEPTH)
     {
-        Score margin = 300 + (100 * depth);
+        Score margin = RAZORING_OFFSET + (RAZORING_MULTI * depth);
 
         if (staticEval + margin <= alpha)
         {
@@ -447,7 +454,7 @@ Score Searcher::Search(int depth, int ply, Score alpha, Score beta, SearchNode* 
     if (!isPVNode && numOurPieces > 0 && !inCheck && depth >= NULL_DEPTH && !isLoss(beta) && nullMoveAllowed &&
         staticEval >= beta)
     {
-        int newDepth = depth * 2 / 3 - 1;
+        int newDepth = depth * NULL_MOVE_DEPTH_MULTI - NULL_MOVE_DEPTH_OFFSET;
 
         SearchNode nullNode(node);
         MakeNullmove(state, ply);
@@ -473,7 +480,7 @@ Score Searcher::Search(int depth, int ply, Score alpha, Score beta, SearchNode* 
     NodeBound nodeBound = NodeBound::Upper;
     Move firstMove = 0;
     int lmpCount = 0;
-    const int lmpThreshold = 3 + 2 * depth * depth;
+    const int lmpThreshold = LMP_OFFSET + LMP_MULTI * depth * depth;
     for (int i = 0; sorter.size != 0; i++)
     {
         Move move = sorter.Next();
@@ -514,7 +521,7 @@ Score Searcher::Search(int depth, int ply, Score alpha, Score beta, SearchNode* 
 
             // Late move reductions (LMR)
             int reductions = 0;
-            if (depth >= lmr_depth && i >= lmr_index && !inCheck && !checkMove && move.isType<QUIET>()) // lmr
+            if (depth >= LMR_DEPTH && i >= LMR_INDEX && !inCheck && !checkMove && move.isType<QUIET>()) // lmr
                 reductions = LMRReduction(depth, i);
 
             score = -Search<CUTNode>(std::max(depth - reductions - 1, 0), ply + 1, -alpha - 1, -alpha, &child);
@@ -691,7 +698,7 @@ void Searcher::IterativeDeepening(Board& board)
     {
         info.seldepth = 0;
 
-        Score delta = aspirationStartingDelta;
+        Score delta = ASPIRATION_STARTING_DELTA;
         Score alpha = prevBestMove.score - delta;
         Score beta = prevBestMove.score + delta;
 
@@ -709,7 +716,7 @@ void Searcher::IterativeDeepening(Board& board)
             SearchNode rootNode(&origin);
             Score eval = Search<RootNode>(d, 0, alpha, beta, &rootNode);
 
-            delta *= aspirationMultiplier;
+            delta *= ASPIRATION_MULTIPLIER;
             if (eval > alpha && eval < beta)
                 break;
             else if (eval <= alpha)
@@ -847,8 +854,12 @@ void Searcher::DoSearch()
     if (!constraints.quiet)
     {
         std::cout << "bestmove " << info.bestmove.move.toString() << std::endl;
-        PrintDebugInfo(info);
+        
+        #ifdef SEARCHINFO
+    PrintDebugInfo(info);
+    #endif
     }
+
     Stop();
 }
 
