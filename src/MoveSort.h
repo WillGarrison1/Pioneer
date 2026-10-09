@@ -29,8 +29,9 @@ enum SortType
     QUIESCENCE
 };
 
-MoveVal ScoreMove(const Board& board, Move m, int ply);
-MoveVal ScoreMoveQ(const Board& board, Move m);
+extern MoveVal ScoreMove(const Board& board, Move m, int ply);
+extern MoveVal ScoreMoveQ(const Board& board, Move m);
+extern Score SEE(const Board& board, Move m);
 
 extern Move killerMoves[MAX_PLY][2];                    // each ply can have two killer moves
 extern int16_t moveHistory[2][64][64];                  // History for [isWhite][from][to]

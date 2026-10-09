@@ -4,9 +4,9 @@
 #include <cstdint>
 #include <cstring>
 
+#include "../SIMD.h"
 #include "accumulator.h"
 #include "halfkav2_hm.h"
-#include "../SIMD.h"
 
 template <typename W_T, typename B_T, size_t IN, size_t OUT, int SCALE = 64, int32_t MAX = 127, bool IS_INPUT = false>
 struct Layer
@@ -36,7 +36,7 @@ struct Layer
     {
         static_assert(!isInputLayer, "Cannot call forward on input layer!");
 
-        alignas(32) int8_t sqrCReLU[in_size];
+        alignas(64) int8_t sqrCReLU[in_size];
 
         SIMD::SqrCReLU(us.data, sqrCReLU, max, in_size);
         SIMD::SqrCReLU(them.data, sqrCReLU + in_size / 2, max, in_size);
@@ -45,10 +45,9 @@ struct Layer
         {
             const int8_t* __restrict w = weights[i];
 
-            int32_t sum = biases[i];
-            
-            sum += SIMD::dotProduct8(sqrCReLU, w, in_size / 2);
-            sum += SIMD::dotProduct8(sqrCReLU + in_size / 2, w + in_size / 2, in_size / 2);
+            int32_t sum = biases[i] + SIMD::dotProduct8(sqrCReLU, w, in_size);
+
+            // sum += SIMD::dotProduct8(sqrCReLU + in_size / 2, w + in_size / 2, in_size / 2);
 
             output[i] = (sum + half_scale) / scale; // Round to nearest integer
         }
@@ -58,15 +57,20 @@ struct Layer
     {
         static_assert(!isInputLayer, "Cannot call forward on input layer!");
 
+        int32_t crelus[in_size];
+        for (size_t j = 0; j < in_size; j++)
+            crelus[j] = CReLU(input[j], max);
+
+        int32_t sums[out_size];
         for (size_t i = 0; i < out_size; i++)
-        {
-            int32_t sum = biases[i];
+            sums[i] = biases[i];
+
+        for (size_t i = 0; i < out_size; i++)
             for (size_t j = 0; j < in_size; j++)
-            {
-                sum += static_cast<int32_t>(weights[i][j]) * CReLU(input[j], max);
-            }
-            output[i] = (sum + half_scale) / scale; // Round to nearest integer
-        }
+                sums[i] += static_cast<int32_t>(weights[i][j]) * crelus[j];
+
+        for (size_t i = 0; i < out_size; i++)
+            output[i] = (sums[i] + half_scale) / scale; // Round to nearest integer
     }
 
     inline void Forwardf(const int32_t* input, float* output) const
@@ -84,6 +88,5 @@ struct Layer
         }
     }
 };
-
 
 #endif // LAYER_H

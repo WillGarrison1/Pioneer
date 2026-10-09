@@ -6,6 +6,49 @@ alignas(64) int16_t moveHistory[2][64][64];                  // History for [isW
 alignas(64) int16_t captureHistory[64][64][PieceType::KING]; // indexed as [from][to][victimPieceType-1]
 alignas(64) int16_t continuationHistory[CONTINUATION_HISTORY_SIZE][6][64][6][64];
 
+Square GetLeastValuableDefender(const Board& board, Bitboard pieces, Square s, Color side)
+{
+
+}
+
+Score SEE(const Board& board, Move m)
+{
+    Bitboard sides[2]; // us, them 
+    sides[1] = board.getBB(~board.sideToMove);
+    
+    Bitboard *us = &sides[0];
+    Bitboard *them = &sides[1];
+    
+    Score gain[32]{0};
+    
+    // make the initial capture
+    gain[i++] = pieceScores[getType(board.getSQ(m.to()))];
+    *us ^= sqrToBB(m.to()) ^ sqrToBB(m.from());
+    *them ^= sqrToBB(m.to());
+
+    Color side = ~board.sideToMove; // other sides turn
+
+
+    while (true)
+    {
+        Square s = GetLeastValuableDefender(board, *us, m.to(), side);
+        if (s == SQ_NONE)
+            break;
+ 
+        gain[i++] = pieceScores[getType(board.getSQ(m.to()))];
+        *us ^= sqrToBB(m.to()) ^ sqrToBB(s);
+        *them ^= sqrToBB(m.to());
+
+        side = ~side;
+        us = &sides[side == board.sideToMove];
+        them = &sides[side != board.sideToMove];
+        
+        
+
+    }
+
+}
+
 MoveVal ScoreMove(const Board& board, Move m, int ply)
 {
     const Piece piece = board.getSQ(m.from());
