@@ -72,7 +72,7 @@ void TranspositionTable::SetEntry(Key zobrist, Score score, int depth, NodeBound
     TranspositionBucket* bucket = &this->buckets[index];
 
     TranspositionEntry* entry = nullptr;
-    int maxPoints = -__INT32_MAX__;
+    int minPoints = __INT32_MAX__;
 
     for (TranspositionEntry& e : bucket->entries)
     {
@@ -86,27 +86,18 @@ void TranspositionTable::SetEntry(Key zobrist, Score score, int depth, NodeBound
         {
             e.setAge(age);
             if (depth < e.depth)
-                return;
+                return; // don't replace a deeper entry with a shallower one
             if (e.getNodeBound() == NodeBound::Exact && bound != NodeBound::Exact)
-                return;
+                return; // don't replace an exact entry with a non-exact one
             entry = &e;
             break;
         }
 
-        int points = 0;
-        if (e.getAge() != age)
-            points += 4;                // punish for being older
-        points += depth - (int)e.depth; // punish for having a lower depth (higher points = worse)
-
-        if (e.getNodeBound() == NodeBound::Exact)
-            points -= 1;
-        if (bound == NodeBound::Exact)
-            points += 1;
-
-        if (maxPoints < points)
+        int points = e.GetRanking(age);
+        if (minPoints > points)
         {
             entry = &e;
-            maxPoints = points;
+            minPoints = points;
         }
     }
 

@@ -144,7 +144,7 @@ void Engine::bench(unsigned int depth)
 
 // Standard perft positions with published node counts.
 struct PerftCase
-{
+{ 
     const char* fen;
     unsigned int depth;
     unsigned long long expected;
@@ -157,13 +157,6 @@ static const PerftCase PERFT_CASES[] = {
     {"r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1", 5, 15833292ULL},
     {"rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8", 5, 89941194ULL},
     {"r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10", 5, 164075551ULL},
-    // Castling-rights regression. White's Kxa8 captures a corner rook, which must clear BLACK's
-    // queenside right. makeMove() used to update rook-square rights in an `else if` hung off the
-    // king-move branch, so a king capture skipped it entirely, and castle generation trusted the
-    // rights bit without checking the rook was there -- together they generated a queenside
-    // castle onto an empty corner, corrupting the bitboards and the zobrist key.
-    // Verified: the pre-fix build reports 53141 here (79 illegal castling nodes), the fixed
-    // build 53062.
     {"r3k2r/1K6/8/8/8/8/8/8 w kq - 0 1", 5, 53062ULL},
 };
 

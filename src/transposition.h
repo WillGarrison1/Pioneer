@@ -8,6 +8,14 @@
 
 #define BUCKET_SIZE 3
 
+constexpr inline int GetAgeDiff(char currentAge, char targetAge)
+{
+    if (currentAge >= targetAge)
+        return currentAge - targetAge;
+    else
+        return currentAge + 64 - targetAge;
+}
+
 enum class NodeBound : unsigned char
 {
     Exact,
@@ -39,6 +47,17 @@ struct TranspositionEntry
     inline void setAge(unsigned char age)
     {
         flags = (flags & 0xc0) | (age & 0x3f);
+    }
+
+    inline int GetRanking(int age) const
+    {
+        int points = -GetAgeDiff(age, getAge()); // penalize older entries (lower points = worse)
+        points += (int)depth;           // reward for having a higher depth (higher points = better)
+
+        if (getNodeBound() == NodeBound::Exact)
+            points += 2; // reward for being an exact node
+
+        return points;
     }
 } __attribute__((packed));
 

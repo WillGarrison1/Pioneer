@@ -34,15 +34,8 @@
 // qsearch that runs on top of the deepest main-search ply.
 constexpr int PLY_LIMIT = MAX_DEPTH - 8;
 
-constexpr int lmr_index = 2; // the first index lmr will be used on
-constexpr int lmr_depth = 2; // the minimum depth lmr can be used
-
-constexpr Score aspirationStartingDelta = 30;
-constexpr float aspirationMultiplier = 1.5f;
-
 #define NULL_DEPTH 3
 #define IIR_DEPTH 3 // internal iterative reduction depth
-#define FUTILITY_MARGIN(DEPTH) (80 + 120 * (DEPTH))
 #define DELTA 200
 
 constexpr auto lmrTable = [] {
@@ -221,18 +214,19 @@ Score Searcher::QSearch(int ply, Score alpha, Score beta, SearchNode* node)
     MoveList moves;
     if (!board.getNumChecks()) // If not in check, generate captures
     {
-        board.generateMoves<CAPTURE>(&moves);
         pat = Eval<FULL>(board, accumulators);
-        if (!moves.GetSize())
-        {
-            return pat;
-        }
 
         if (pat >= beta)
             return pat;
 
         if (alpha < pat)
             alpha = pat;
+
+        board.generateMoves<CAPTURE>(&moves);
+        if (!moves.GetSize())
+        {
+            return pat;
+        }
     }
     else // if in check, generate evasions
     {
@@ -404,19 +398,6 @@ Score Searcher::Search(int depth, int ply, Score alpha, Score beta, SearchNode* 
     if (!entry)
         ttOrStaticScore = node->staticEval;
 
-    MoveList moves;
-    board.generateMoves<ALL_MOVES>(&moves);
-
-    if (moves.GetSize() == 0)
-    {
-        Score mateScore = 0; // stalemate
-        if (inCheck)         // if in check, then checkmate
-            mateScore = -MATE + ply;
-
-        ttable.SetEntry(board.getHash(), mateToTT(mateScore, ply), depth, NodeBound::Exact, 0);
-        return mateScore;
-    }
-
     // 50-move draw. Tested here rather than at node entry because checkmate on the 100th ply
     // beats the draw, and that is only knowable once we have a legal move count (handled by the
     // mate/stalemate block above, which runs first). `>=` rather than `==`: the counter is only
@@ -470,6 +451,19 @@ Score Searcher::Search(int depth, int ply, Score alpha, Score beta, SearchNode* 
             if (score >= beta)
                 return nullScore;
         }
+    }
+
+    MoveList moves;
+    board.generateMoves<ALL_MOVES>(&moves);
+
+    if (moves.GetSize() == 0)
+    {
+        Score mateScore = 0; // stalemate
+        if (inCheck)         // if in check, then checkmate
+            mateScore = -MATE + ply;
+
+        ttable.SetEntry(board.getHash(), mateToTT(mateScore, ply), depth, NodeBound::Exact, 0);
+        return mateScore;
     }
 
     MoveSorter sorter(board, &moves, bestEntryMove, ply);
@@ -649,9 +643,9 @@ Score Searcher::Search(int depth, int ply, Score alpha, Score beta, SearchNode* 
                     uint64_t nodes = info.numNodes + info.numQNodes;
                     uint64_t nps = nodes * 1000 / std::max(time, 1ull);
 
-                    std::cout << "info depth " << depth << " currmove " << bestM.toString() << " "
-                              << ScoreToUCI(score) << " time " << time << " nodes " << nodes << " nps " << nps
-                              << " pv " << GetMoveListString(&info.pv) << std::endl;
+                    std::cout << "info depth " << depth << " currmove " << bestM.toString() << " " << ScoreToUCI(score)
+                              << " time " << time << " nodes " << nodes << " nps " << nps << " pv "
+                              << GetMoveListString(&info.pv) << std::endl;
                 }
             }
         }
@@ -854,10 +848,10 @@ void Searcher::DoSearch()
     if (!constraints.quiet)
     {
         std::cout << "bestmove " << info.bestmove.move.toString() << std::endl;
-        
-        #ifdef SEARCHINFO
-    PrintDebugInfo(info);
-    #endif
+
+#ifdef SEARCHINFO
+        PrintDebugInfo(info);
+#endif
     }
 
     Stop();
