@@ -29,60 +29,9 @@ enum SortType
     QUIESCENCE
 };
 
-MoveVal ScoreMove(const Board& board, Move m, int ply);
-MoveVal ScoreMoveQ(const Board& board, Move m);
-
-struct MoveSorter
-{
-    MoveVal moveVals[256];
-    unsigned int size;
-
-    MoveSorter(const Board& board, MoveList* mlist, Move best, int ply) : size(0)
-    {
-
-        while (size < mlist->GetSize())
-        {
-            if (mlist->moves[size] == best)
-            {
-                moveVals[size] = moveVals[0];
-                moveVals[0] = {best, PV_BONUS};
-            }
-            else
-            {
-                if (mlist->moves[size].isType<CAPTURE>())
-                    moveVals[size] = ScoreMoveQ(board, mlist->moves[size]);
-                else
-                    moveVals[size] = ScoreMove(board, mlist->moves[size], ply);
-            }
-            size++;
-        }
-    }
-
-    ~MoveSorter() = default;
-    Move Next()
-    {
-        int bestIndex = 0;
-        int bestScore = moveVals[0].score;
-
-        if (bestScore != PV_BONUS) // if the best move is the PV move, return it immediately
-            for (unsigned int i = 1; i < size; i++)
-            {
-                if (moveVals[i].score > bestScore)
-                {
-                    bestScore = moveVals[i].score;
-                    bestIndex = i;
-                }
-            }
-
-        MoveVal bestMove = moveVals[bestIndex];
-
-        // Swap the best move with the end list
-        moveVals[bestIndex] = moveVals[--size];
-        moveVals[size] = bestMove;
-
-        return bestMove.m;
-    }
-};
+extern MoveVal ScoreMove(const Board& board, Move m, int ply);
+extern MoveVal ScoreMoveQ(const Board& board, Move m);
+extern Score SEE(const Board& board, Move m);
 
 extern Move killerMoves[MAX_PLY][2];                    // each ply can have two killer moves
 extern int16_t moveHistory[2][64][64];                  // History for [isWhite][from][to]
@@ -100,6 +49,20 @@ inline void addKillerMove(int ply, Move m)
 
     killerMoves[ply][1] = killerMoves[ply][0];
     killerMoves[ply][0] = m;
+}
+
+// returns 0 if not killer move, 1 if first killer, 2 if second killer
+inline int isKillerMove(int ply, Move m)
+{
+    if (killerMoves[ply][0] == m)
+    {
+        return 1;
+    }
+    if (killerMoves[ply][1] == m)
+    {
+        return 2;
+    }
+    return 0;
 }
 
 inline void updateContinuationHistory(Board& board, Move m, int depth, bool negate)
@@ -171,4 +134,100 @@ inline Score Mvv_Lva_Score(const Board& board, Move m)
 
     return (pieceScores[victimType] - pieceScores[pieceType]);
 }
+
+struct MoveSorter
+{
+    enum MoveIndex
+    {
+        BEST,
+        CAPTURE,
+        QUIET
+    };
+
+    MoveVal moves[1 + 218 + 218]; // best, captures, quiets
+    uint8_t numMoves[3]{0}; // best, captures, quiets
+
+    uint8_t currentBucketNum;
+
+    const Board& board;
+    int ply;
+
+    MoveSorter(const Board& board, MoveList* mlist, Move best, int ply) : currentBucketNum(0), board(board), ply(ply)
+    {
+        for (uint32_t i = 0; i < mlist->GetSize(); i++)
+        {
+            if (mlist->moves[i] == best)
+            {
+                moves[0] = {best, PV_BONUS};
+                numMoves[MoveIndex::BEST]++;
+            }
+            else
+            {
+                MoveIndex bucket = mlist->moves[i].isType<MoveType::CAPTURE>() ? CAPTURE : QUIET;
+                MoveVal* ptr = GetBucket(bucket);
+                ptr[numMoves[bucket]++] = {mlist->moves[i],0};
+            }
+        }
+    }
+    
+    ~MoveSorter() = default;
+
+    MoveVal* GetBucket(int bucketNum)
+    {
+        return moves + ((bucketNum == 2) ? 219 : bucketNum);
+    }
+
+    void ScoreBucket(int bucketNum)
+    {
+        MoveVal* bucket = GetBucket(bucketNum);
+        if (bucketNum == CAPTURE)
+        {
+            for (uint32_t i = 0; i < numMoves[bucketNum]; i++)
+            {
+                bucket[i] = ScoreMoveQ(board, bucket[i].m);
+            }
+        }
+        else if (bucketNum == QUIET)
+        {
+            for (uint32_t i = 0; i < numMoves[bucketNum]; i++)
+            {
+                bucket[i] = ScoreMove(board, bucket[i].m, ply);
+            }
+        }
+    }
+
+    Move Next()
+    {
+        while (numMoves[currentBucketNum] == 0)
+        {
+            currentBucketNum += 1; // if bucket empty, go to next bucket
+            if (currentBucketNum >= std::size(numMoves))
+                return 0; // no more buckets, return invalid move to signal end
+            ScoreBucket(currentBucketNum);
+        }
+
+        MoveVal* currentPtr = GetBucket(currentBucketNum);
+
+        int bestIndex = 0;
+        int bestScore = currentPtr[0].score;
+
+        for (int i = 1; i < numMoves[currentBucketNum]; i++)
+        {
+            if (bestScore < currentPtr[i].score)
+            {
+                bestIndex = i;
+                bestScore = currentPtr[i].score;
+            }
+        }
+
+        MoveVal bestmove = currentPtr[bestIndex];
+
+        // Swap the best move with the end list
+        currentPtr[bestIndex] = currentPtr[--numMoves[currentBucketNum]];
+        currentPtr[numMoves[currentBucketNum]] = bestmove;
+
+        return bestmove.m;
+    }
+};
+
 #endif

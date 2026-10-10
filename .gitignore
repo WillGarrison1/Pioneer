@@ -5,7 +5,6 @@
 /.vscode/
 /tools/__pycache__
 /out
-/tune
 /CMakePresets*
 CMakePresets.json
 /util/__pycache__
