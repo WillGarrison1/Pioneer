@@ -140,12 +140,13 @@ struct MoveSorter
     enum MoveIndex
     {
         BEST,
-        CAPTURE,
-        QUIET
+        GOOD_CAPTURE,
+        QUIET,
+        BAD_CAPTURE
     };
 
-    MoveVal moves[1 + 218 + 218]; // best, captures, quiets
-    uint8_t numMoves[3]{0}; // best, captures, quiets
+    MoveVal moves[1 + 112 + 218 + 112]; // best, good captures, quiets, bad captures
+    uint8_t numMoves[4]{0};             // best, good captures, quiets, bad captures
 
     uint8_t currentBucketNum;
 
@@ -163,24 +164,26 @@ struct MoveSorter
             }
             else
             {
-                MoveIndex bucket = mlist->moves[i].isType<MoveType::CAPTURE>() ? CAPTURE : QUIET;
+                MoveIndex bucket = mlist->moves[i].isType<MoveType::CAPTURE>() ? GOOD_CAPTURE : QUIET;
                 MoveVal* ptr = GetBucket(bucket);
-                ptr[numMoves[bucket]++] = {mlist->moves[i],0};
+                ptr[numMoves[bucket]++] = {mlist->moves[i], 0};
             }
         }
     }
-    
+
     ~MoveSorter() = default;
 
     MoveVal* GetBucket(int bucketNum)
     {
-        return moves + ((bucketNum == 2) ? 219 : bucketNum);
+        static constexpr int bucketOffsets[4] = {0, 1, 1 + 112,
+                                                 1 + 112 + 218}; // best, good captures, quiets, bad captures
+        return moves + bucketOffsets[bucketNum];
     }
 
     void ScoreBucket(int bucketNum)
     {
         MoveVal* bucket = GetBucket(bucketNum);
-        if (bucketNum == CAPTURE)
+        if (bucketNum == GOOD_CAPTURE)
         {
             for (uint32_t i = 0; i < numMoves[bucketNum]; i++)
             {
@@ -208,15 +211,43 @@ struct MoveSorter
 
         MoveVal* currentPtr = GetBucket(currentBucketNum);
 
-        int bestIndex = 0;
-        int bestScore = currentPtr[0].score;
+        int bestIndex;
+        int bestScore;
 
-        for (int i = 1; i < numMoves[currentBucketNum]; i++)
+        while (true)
         {
-            if (bestScore < currentPtr[i].score)
+            bestIndex = 0;
+            bestScore = currentPtr[0].score;
+
+            for (int i = 1; i < numMoves[currentBucketNum]; i++)
             {
-                bestIndex = i;
-                bestScore = currentPtr[i].score;
+                if (bestScore < currentPtr[i].score)
+                {
+                    bestIndex = i;
+                    bestScore = currentPtr[i].score;
+                }
+            }
+
+            if (currentBucketNum == MoveIndex::GOOD_CAPTURE)
+            {
+                Score see = SEE(board, currentPtr[bestIndex].m);
+                if (see >= 0)
+                {
+                    break; // good capture, return it
+                }
+                // bad capture, move to bad capture bucket
+                MoveVal badCapture = currentPtr[bestIndex];
+                currentPtr[bestIndex] = currentPtr[--numMoves[currentBucketNum]];
+                GetBucket(MoveIndex::BAD_CAPTURE)[numMoves[MoveIndex::BAD_CAPTURE]++] = badCapture;
+
+                if (numMoves[currentBucketNum] == 0)
+                {
+                    return Next(); // no more good captures, go to next bucket
+                }
+            }
+            else
+            {
+                break; // not a capture, return it
             }
         }
 

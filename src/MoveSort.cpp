@@ -1,4 +1,5 @@
 #include "MoveSort.h"
+#include "magic.h"
 
 alignas(64) Move killerMoves[MAX_PLY][2]; // each ply can have two killer moves
 alignas(64) Move counterMove[64][64];
@@ -6,47 +7,78 @@ alignas(64) int16_t moveHistory[2][64][64];                  // History for [isW
 alignas(64) int16_t captureHistory[64][64][PieceType::KING]; // indexed as [from][to][victimPieceType-1]
 alignas(64) int16_t continuationHistory[CONTINUATION_HISTORY_SIZE][6][64][6][64];
 
-Square GetLeastValuableDefender(const Board& board, Bitboard pieces, Square s, Color side)
+Square GetLeastValuableDefender(const Board& board, Bitboard pieces, Bitboard blockers, Square s, Color side)
 {
+    Bitboard pawns = pieces & board.getBB(side, PAWN) & pawnAttacks[~side][s];
+    Bitboard knights = pieces & board.getBB(side, KNIGHT) & knightMoves[s];
+    Bitboard bishops = pieces & board.getBB(side, BISHOP) & GetBishopMoves(blockers, s);
+    Bitboard rooks = pieces & board.getBB(side, ROOK) & GetRookMoves(blockers, s);
+    Bitboard queens = pieces & board.getBB(side, QUEEN) & (GetRookMoves(blockers, s) | GetBishopMoves(blockers, s));
+    Bitboard king = pieces & board.getBB(side, KING) & kingMoves[s];
 
+    if (pawns)
+        return lsb(pawns);
+    if (knights)
+        return lsb(knights);
+    if (bishops)
+        return lsb(bishops);
+    if (rooks)
+        return lsb(rooks);
+    if (queens)
+        return lsb(queens);
+    if (king)
+    {
+        // check if enemy is attacking the square (king can't defend then)
+        if (GetLeastValuableDefender(board, pieces ^ blockers, blockers ^ king, s, ~side) == SQ_NONE)
+            return lsb(king);
+    }
+    return SQ_NONE;
 }
 
 Score SEE(const Board& board, Move m)
 {
-    Bitboard sides[2]; // us, them 
+    Bitboard sides[2]; // us, them
+    sides[0] = board.getBB(board.sideToMove);
     sides[1] = board.getBB(~board.sideToMove);
-    
-    Bitboard *us = &sides[0];
-    Bitboard *them = &sides[1];
-    
+
+    Bitboard* us = &sides[0];
+    Bitboard* them = &sides[1];
+
     Score gain[32]{0};
-    
+    int i = 0;
+
     // make the initial capture
+    PieceType fromType = getType(board.getSQ(m.from()));
     gain[i++] = pieceScores[getType(board.getSQ(m.to()))];
     *us ^= sqrToBB(m.to()) ^ sqrToBB(m.from());
-    *them ^= sqrToBB(m.to());
+    *them &= ~sqrToBB(m.to());
 
     Color side = ~board.sideToMove; // other sides turn
-
+    us = &sides[side != board.sideToMove];
+    them = &sides[side == board.sideToMove];
 
     while (true)
     {
-        Square s = GetLeastValuableDefender(board, *us, m.to(), side);
+        Square s = GetLeastValuableDefender(board, *us, *us | *them, m.to(), side);
         if (s == SQ_NONE)
             break;
- 
-        gain[i++] = pieceScores[getType(board.getSQ(m.to()))];
+
+        gain[i++] = pieceScores[fromType];
+        fromType = getType(board.getSQ(s));
         *us ^= sqrToBB(m.to()) ^ sqrToBB(s);
-        *them ^= sqrToBB(m.to());
+        *them &= ~sqrToBB(m.to());
 
         side = ~side;
-        us = &sides[side == board.sideToMove];
-        them = &sides[side != board.sideToMove];
-        
-        
-
+        us = &sides[side != board.sideToMove];
+        them = &sides[side == board.sideToMove];
     }
 
+    for (int j = i - 1; j > 0; j--)
+    {
+        gain[j - 1] -= std::max(0, gain[j]);
+    }
+
+    return gain[0];
 }
 
 MoveVal ScoreMove(const Board& board, Move m, int ply)

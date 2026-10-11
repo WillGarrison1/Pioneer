@@ -250,6 +250,9 @@ Score Searcher::QSearch(int ply, Score alpha, Score beta, SearchNode* node)
         {
             break;
         }
+        // don't search bad captures if not in check
+        if (!board.getNumChecks() && sorter.currentBucketNum == MoveSorter::BAD_CAPTURE)
+            break;
         // Delta pruning
         if (!board.getNumChecks() && !m.isType<PROMOTION>())
         {
@@ -401,10 +404,6 @@ Score Searcher::Search(int depth, int ply, Score alpha, Score beta, SearchNode* 
     if (!entry)
         ttOrStaticScore = node->staticEval;
 
-    // 50-move draw. Tested here rather than at node entry because checkmate on the 100th ply
-    // beats the draw, and that is only knowable once we have a legal move count (handled by the
-    // mate/stalemate block above, which runs first). `>=` rather than `==`: the counter is only
-    // sampled at nodes we visit, so an exact comparison can be stepped over entirely.
     if (!isRootNode && board.getState()->move50rule >= 100)
         return 0;
 
@@ -468,6 +467,9 @@ Score Searcher::Search(int depth, int ply, Score alpha, Score beta, SearchNode* 
         ttable.SetEntry(board.getHash(), mateToTT(mateScore, ply), depth, NodeBound::Exact, 0);
         return mateScore;
     }
+
+    Move quietsTried[64], capturesTried[32];
+    int numQuietsTried = 0, numCapturesTried = 0;
 
     MoveSorter sorter(board, &moves, bestEntryMove, ply);
 
@@ -604,21 +606,17 @@ Score Searcher::Search(int depth, int ply, Score alpha, Score beta, SearchNode* 
                 updateContinuationHistory(board, move, depth, false);
             }
 
-            for (unsigned int p = moves.GetSize() - i; p < moves.GetSize(); p++)
+            for (int j = 0; j < numQuietsTried; j++)
             {
-                Move penaltyMove = sorter.moves[p].m;
-                if (penaltyMove == move)
-                    continue;
+                Move penaltyMove = quietsTried[j];
+                addHistoryPenalty(board.whiteToMove, penaltyMove, depth);
+                updateContinuationHistory(board, penaltyMove, depth, true);
+            }
 
-                if (penaltyMove.isType<QUIET>())
-                {
-                    addHistoryPenalty(board.whiteToMove, penaltyMove, depth);
-                    updateContinuationHistory(board, penaltyMove, depth, true);
-                }
-                else if (penaltyMove.isType<CAPTURE>())
-                {
-                    addCapturePenalty(CapturedType(board, penaltyMove), penaltyMove, depth);
-                }
+            for (int j = 0; j < numCapturesTried; j++)
+            {
+                Move penaltyMove = capturesTried[j];
+                addCapturePenalty(CapturedType(board, penaltyMove), penaltyMove, depth);
             }
 
             ttable.SetEntry(board.getHash(), mateToTT(score, ply), depth, NodeBound::Lower, move);
@@ -657,6 +655,15 @@ Score Searcher::Search(int depth, int ply, Score alpha, Score beta, SearchNode* 
                               << GetMoveListString(&info.pv) << std::endl;
                 }
             }
+        }
+
+        if (move.isType<CAPTURE>() && numCapturesTried < sizeof(capturesTried) / sizeof(capturesTried[0]))
+        {
+            capturesTried[numCapturesTried++] = move;
+        }
+        else if (move.isType<QUIET>() && numQuietsTried < sizeof(quietsTried) / sizeof(quietsTried[0]))
+        {
+            quietsTried[numQuietsTried++] = move;
         }
     }
 
