@@ -71,7 +71,7 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
                 # PGO builds, on the same kind of workload -- preferred over guessing.
                 # -fprofile-correction: tolerate counter inconsistencies from threaded execution.
                 # -Wmissing-profile is left on deliberately: a missing profile makes PGO a net loss.
-                add_compile_options(-fprofile-use -fno-peel-loops -fno-tracer -fprofile-correction ${PIONEER_PGO_EXTRA})
+                add_compile_options(-fprofile-use -fprofile-partial-training -fno-peel-loops -fno-tracer -fprofile-correction ${PIONEER_PGO_EXTRA})
                 add_link_options(-fprofile-use -fno-peel-loops -fno-tracer -fprofile-correction ${PIONEER_PGO_EXTRA})
             endif()
 

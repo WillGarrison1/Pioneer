@@ -643,25 +643,14 @@ Score Searcher::Search(int depth, int ply, Score alpha, Score beta, SearchNode* 
             {
                 info.pv = node->pvLine;
                 info.bestmove = {bestM, bestS};
-
-                if (!constraints.quiet)
-                {
-                    uint64_t time = getTime() - info.startTime;
-                    uint64_t nodes = info.numNodes + info.numQNodes;
-                    uint64_t nps = nodes * 1000 / std::max(time, 1ull);
-
-                    std::cout << "info depth " << depth << " currmove " << bestM.toString() << " " << ScoreToUCI(score)
-                              << " time " << time << " nodes " << nodes << " nps " << nps << " pv "
-                              << GetMoveListString(&info.pv) << std::endl;
-                }
             }
         }
 
-        if (move.isType<CAPTURE>() && numCapturesTried < sizeof(capturesTried) / sizeof(capturesTried[0]))
+        if (move.isType<CAPTURE>() && numCapturesTried < static_cast<int>(sizeof(capturesTried) / sizeof(capturesTried[0])))
         {
             capturesTried[numCapturesTried++] = move;
         }
-        else if (move.isType<QUIET>() && numQuietsTried < sizeof(quietsTried) / sizeof(quietsTried[0]))
+        else if (move.isType<QUIET>() && numQuietsTried < static_cast<int>(sizeof(quietsTried) / sizeof(quietsTried[0])))
         {
             quietsTried[numQuietsTried++] = move;
         }
