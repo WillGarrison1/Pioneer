@@ -25,7 +25,6 @@
 #define MATE 31000
 
 #define FUTILITY_MARGIN(DEPTH) (FUTILITY_OFFSET + FUTILITY_MULTI * (DEPTH))
-#define FUTILITY_DEPTH 4
 
 // Hard ceiling on search ply. `ply` is NOT bounded by `depth`: a check extension keeps depth
 // constant while ply still increments, so a forcing sequence can climb indefinitely. The
@@ -33,10 +32,6 @@
 // this cap a long check sequence writes past the end of that allocation. Leave headroom for the
 // qsearch that runs on top of the deepest main-search ply.
 constexpr int PLY_LIMIT = MAX_DEPTH - 8;
-
-#define NULL_DEPTH 3
-#define IIR_DEPTH 3 // internal iterative reduction depth
-#define DELTA 200
 
 constexpr auto lmrTable = [] {
     std::array<std::array<int, 256>, MAX_DEPTH> table{};
@@ -525,8 +520,13 @@ Score Searcher::Search(int depth, int ply, Score alpha, Score beta, SearchNode* 
 
             // Late move reductions (LMR)
             int reductions = 0;
-            if (depth >= LMR_DEPTH && i >= LMR_INDEX && !inCheck && !checkMove && move.isType<QUIET>()) // lmr
-                reductions = LMRReduction(depth, i);
+            if (depth >= LMR_DEPTH && i >= LMR_INDEX && !inCheck && !checkMove)
+            {
+                if (move.isType<QUIET>())
+                    reductions = LMRReduction(depth, i);
+                else if (sorter.currentBucketNum == MoveSorter::BAD_CAPTURE) // lmr
+                    reductions = std::min(LMRReduction(depth, i) - 1, 1);
+            }
 
             score = -Search<CUTNode>(std::max(depth - reductions - 1, 0), ply + 1, -alpha - 1, -alpha, &child);
 
@@ -574,6 +574,9 @@ Score Searcher::Search(int depth, int ply, Score alpha, Score beta, SearchNode* 
         }
         Undomove(ply);
 
+        if (!isRunning.load(std::memory_order::memory_order_relaxed))
+            return 0;
+
         // update root move score if we are root node
         if constexpr (isRootNode)
         {
@@ -586,9 +589,6 @@ Score Searcher::Search(int depth, int ply, Score alpha, Score beta, SearchNode* 
                 }
             }
         }
-
-        if (!isRunning.load(std::memory_order::memory_order_relaxed))
-            return 0;
 
         if (score >= beta)
         {
@@ -646,11 +646,13 @@ Score Searcher::Search(int depth, int ply, Score alpha, Score beta, SearchNode* 
             }
         }
 
-        if (move.isType<CAPTURE>() && numCapturesTried < static_cast<int>(sizeof(capturesTried) / sizeof(capturesTried[0])))
+        if (move.isType<CAPTURE>() &&
+            numCapturesTried < static_cast<int>(sizeof(capturesTried) / sizeof(capturesTried[0])))
         {
             capturesTried[numCapturesTried++] = move;
         }
-        else if (move.isType<QUIET>() && numQuietsTried < static_cast<int>(sizeof(quietsTried) / sizeof(quietsTried[0])))
+        else if (move.isType<QUIET>() &&
+                 numQuietsTried < static_cast<int>(sizeof(quietsTried) / sizeof(quietsTried[0])))
         {
             quietsTried[numQuietsTried++] = move;
         }
@@ -731,6 +733,12 @@ void Searcher::IterativeDeepening(Board& board)
             }
         }
 
+        if (!isRunning.load(std::memory_order::memory_order_relaxed))
+        {
+            info.bestmove = prevBestMove;
+            break;
+        }
+
         if (!constraints.quiet)
         {
             uint64_t time = getTime() - info.startTime;
@@ -741,12 +749,6 @@ void Searcher::IterativeDeepening(Board& board)
                       << info.bestmove.move.toString() << " " << ScoreToUCI(info.bestmove.score) << " nodes " << nodes
                       << " time " << time << " nps " << nps << " hashfull " << (int)(ttable.GetFull() * 1000) << " pv "
                       << GetMoveListString(&info.pv) << std::endl;
-        }
-
-        if (!isRunning.load(std::memory_order::memory_order_relaxed))
-        {
-            info.bestmove = prevBestMove;
-            break;
         }
 
         prevBestMove = info.bestmove;
@@ -793,15 +795,10 @@ void Searcher::ComputeMovetime()
     unsigned long long soft;
     if (constraints.movesToGo > 0)
     {
-        // Fixed number of moves until the next control: divide what's left, plus most of the
-        // increment we are guaranteed to get back.
         soft = remaining / std::max(constraints.movesToGo, 1u) + (inc * 3) / 4;
     }
     else
     {
-        // Sudden death or increment-only. The increment term is the important part: at a control
-        // like 8+0.08 the base share alone is a small fraction of what we can actually afford,
-        // and ignoring the increment (as this previously did) throws away most of the budget.
         soft = remaining / 20 + (inc * 3) / 4;
     }
 
@@ -840,7 +837,6 @@ void Searcher::DoSearch()
 
     constraints.maxDepth = constraints.maxDepth == 0 ? MAX_DEPTH : constraints.maxDepth;
     constraints.maxNodes = constraints.maxNodes == 0 ? UINT_MAX : constraints.maxNodes;
-    ComputeMovetime();
 
     MoveList mlist;
     board.generateMoves<ALL_MOVES>(&mlist);
@@ -849,6 +845,7 @@ void Searcher::DoSearch()
     {
         info.rootMoves.Add(RootMove{*i, 0});
     }
+    ComputeMovetime();
 
     ttable.IncrementAge();
     IterativeDeepening(board);
