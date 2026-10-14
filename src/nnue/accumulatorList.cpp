@@ -11,7 +11,7 @@ AccumulatorList::AccumulatorList() : last(0)
 
 AccumulatorList::~AccumulatorList()
 {
-    operator delete(accumulators, std::align_val_t(64));
+    operator delete[](accumulators, std::align_val_t(64));
 }
 
 void AccumulatorList::ComputeAccumulator(const Board& board)
@@ -127,7 +127,6 @@ void AccumulatorList::ComputeAccumulator(const Board& board)
     {
         Accumulator& acc = accumulatorNode.whiteAcc;
         acc = whiteComputed.whiteAcc;
-
 
         int current = last;
 

@@ -18,7 +18,7 @@
 enum NodeType
 {
     PVNode,
-    CUTNode,
+    CutNode,
     RootNode
 };
 

@@ -291,12 +291,11 @@ Score Searcher::Search(int depth, int ply, Score alpha, Score beta, SearchNode* 
 {
     constexpr bool isPVNode = nodeT == PVNode || nodeT == RootNode;
     constexpr bool isRootNode = nodeT == RootNode;
+    constexpr bool isCutNode = nodeT == CutNode;
 
     if (!isRunning.load(std::memory_order::memory_order_relaxed))
         return 0;
 
-    // Sample the clock every 2048 nodes rather than at every node: getTime() was previously
-    // called once per node, which is pure overhead on the hottest path in the engine.
     if ((info.numNodes & 2047ULL) == 0 && getTime() - info.startTime > hardLimit)
     {
         isRunning = false;
@@ -312,10 +311,6 @@ Score Searcher::Search(int depth, int ply, Score alpha, Score beta, SearchNode* 
     if (!isRootNode && board.getState()->repetition >= 3)
         return 0; // draw by repetition
 
-    // Note: the 50-move draw is tested after move generation below, because a mate delivered on
-    // the 100th ply takes precedence over the draw and that needs the legal move count.
-
-    // See PLY_LIMIT: nothing else bounds `ply`, and exceeding it is an out-of-bounds write.
     if (ply >= PLY_LIMIT)
         return board.getNumChecks() ? 0 : Eval<FULL>(board, accumulators);
 
@@ -428,7 +423,7 @@ Score Searcher::Search(int depth, int ply, Score alpha, Score beta, SearchNode* 
 
     // null move pruning
 
-    int numOurPieces = popCount(board.getBB(ALL_PIECES, board.sideToMove) & ~board.getBB(PAWN));
+    int numOurPieces = popCount(board.getBB(board.sideToMove, ALL_PIECES) & ~board.getBB(PAWN));
     if (!isPVNode && numOurPieces > 0 && !inCheck && depth >= NULL_DEPTH && !isLoss(beta) && nullMoveAllowed &&
         staticEval >= beta)
     {
@@ -436,7 +431,7 @@ Score Searcher::Search(int depth, int ply, Score alpha, Score beta, SearchNode* 
 
         SearchNode nullNode(node);
         MakeNullmove(state, ply);
-        Score nullScore = -Search<CUTNode>(newDepth, ply + 1, -beta, -beta + 1, &nullNode);
+        Score nullScore = -Search<CutNode>(newDepth, ply + 1, -beta, -beta + 1, &nullNode);
         UndoNullmove(ply);
         if (nullScore >= beta)
         {
@@ -444,7 +439,7 @@ Score Searcher::Search(int depth, int ply, Score alpha, Score beta, SearchNode* 
             // the *current* position and must use `ply`, not `ply + 1` -- mate scores round-trip
             // through mateToTT/ttToMate keyed on ply, so an off-by-one here corrupts them.
             SearchNode verifyNode(node);
-            Score score = Search<CUTNode>(newDepth, ply, beta - 1, beta, &verifyNode, false);
+            Score score = Search<CutNode>(newDepth, ply, beta - 1, beta, &verifyNode, false);
             if (score >= beta)
                 return nullScore;
         }
@@ -523,12 +518,14 @@ Score Searcher::Search(int depth, int ply, Score alpha, Score beta, SearchNode* 
             if (depth >= LMR_DEPTH && i >= LMR_INDEX && !inCheck && !checkMove)
             {
                 if (move.isType<QUIET>())
-                    reductions = LMRReduction(depth, i);
+                {
+                    reductions = LMRReduction(depth, i) + isCutNode;
+                }
                 else if (sorter.currentBucketNum == MoveSorter::BAD_CAPTURE) // lmr
-                    reductions = std::min(LMRReduction(depth, i) - 1, 1);
+                    reductions = std::max(LMRReduction(depth, i) - 1, 0);
             }
 
-            score = -Search<CUTNode>(std::max(depth - reductions - 1, 0), ply + 1, -alpha - 1, -alpha, &child);
+            score = -Search<CutNode>(std::max(depth - reductions - 1, 0), ply + 1, -alpha - 1, -alpha, &child);
 
             if (score > alpha)
             {
@@ -570,7 +567,7 @@ Score Searcher::Search(int depth, int ply, Score alpha, Score beta, SearchNode* 
             if constexpr (isPVNode)
                 score = -Search<PVNode>(depth + extension - 1, ply + 1, -beta, -alpha, &child);
             else
-                score = -Search<CUTNode>(depth + extension - 1, ply + 1, -alpha - 1, -alpha, &child);
+                score = -Search<CutNode>(depth + extension - 1, ply + 1, -alpha - 1, -alpha, &child);
         }
         Undomove(ply);
 
@@ -852,6 +849,9 @@ void Searcher::DoSearch()
 
     if (!constraints.quiet)
     {
+        // A search stopped before finishing depth 1 has no best move; never send a null bestmove.
+        if (info.bestmove.move.getMove() == 0 && info.rootMoves.numRoots > 0)
+            info.bestmove.move = info.rootMoves[0].move;
         std::cout << "bestmove " << info.bestmove.move.toString() << std::endl;
 
 #ifdef SEARCHINFO
@@ -868,7 +868,9 @@ void Searcher::WorkerLoop()
     {
         {
             std::unique_lock lock(mtx);
-            cv.wait(lock, [&] { return isRunning == true || isQuit == true; });
+            // Wait on isSearching, not isRunning: a Stop() landing between StartSearch() and this thread
+            // waking clears isRunning, and the worker would sleep forever while WaitForSearch() waits.
+            cv.wait(lock, [&] { return isSearching == true || isQuit == true; });
         }
 
         if (isQuit)

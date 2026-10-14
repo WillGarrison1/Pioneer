@@ -292,7 +292,7 @@ void Board::makeMove(Move move, BoardState* newState, DirtyMove& dirtyMove)
                     takers |= sqrToBB(to + 1);
                 }
 
-                if (getBB(PAWN, ~sideToMove) & takers)
+                if (getBB(~sideToMove, PAWN) & takers)
                 {
                     newState->enPassantSquare = static_cast<Square>(to - (whiteToMove ? NORTH : SOUTH));
                     newState->zobristHash ^= enPassantHash[getFile(to)];

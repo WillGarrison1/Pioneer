@@ -2,6 +2,7 @@
 #define SEARCH_INFO_H
 
 #include "SearchNode.h"
+// #define SEARCHINFO
 
 struct RootMove
 {
