@@ -90,6 +90,10 @@ void TranspositionTable::SetEntry(Key zobrist, Score score, int depth, NodeBound
             if (e.getNodeBound() == NodeBound::Exact && bound != NodeBound::Exact)
                 return; // don't replace an exact entry with a non-exact one
             entry = &e;
+
+            if (bestMove.getMove() == 0 && e.move != 0)
+                bestMove = Move(e.move); // preserve the best move if we don't have one
+
             break;
         }
 

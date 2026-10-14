@@ -435,9 +435,15 @@ Score Searcher::Search(int depth, int ply, Score alpha, Score beta, SearchNode* 
         UndoNullmove(ply);
         if (nullScore >= beta)
         {
-            // Verification search. The null move was already undone above, so this re-searches
-            // the *current* position and must use `ply`, not `ply + 1` -- mate scores round-trip
-            // through mateToTT/ttToMate keyed on ply, so an off-by-one here corrupts them.
+            if (isWin(nullScore))
+                nullScore = beta;
+
+            if (depth < NULL_MOVE_VERIFY_DEPTH)
+            {
+                ttable.SetEntry(board.getHash(), mateToTT(nullScore, ply), depth, NodeBound::Lower, 0);
+                return nullScore;
+            }
+
             SearchNode verifyNode(node);
             Score score = Search<CutNode>(newDepth, ply, beta - 1, beta, &verifyNode, false);
             if (score >= beta)
@@ -521,8 +527,10 @@ Score Searcher::Search(int depth, int ply, Score alpha, Score beta, SearchNode* 
                 {
                     reductions = LMRReduction(depth, i) + isCutNode;
                 }
-                else if (sorter.currentBucketNum == MoveSorter::BAD_CAPTURE) // lmr
+                else if (sorter.currentBucketNum == MoveSorter::BAD_CAPTURE)
                     reductions = std::max(LMRReduction(depth, i) - 1, 0);
+
+                // reductions = std::max(reductions - isPVNode, 0);
             }
 
             score = -Search<CutNode>(std::max(depth - reductions - 1, 0), ply + 1, -alpha - 1, -alpha, &child);
