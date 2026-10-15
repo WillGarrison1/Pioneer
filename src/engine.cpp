@@ -51,6 +51,9 @@ void Engine::makemove(Move move)
 {
     quiesceSearch();
 
+    if (states.size() <= board->getPly() + 1)
+        states.emplace_back();
+
     MoveList legal;
     board->generateMoves<ALL_MOVES>(&legal);
 
@@ -144,7 +147,7 @@ void Engine::bench(unsigned int depth)
 
 // Standard perft positions with published node counts.
 struct PerftCase
-{ 
+{
     const char* fen;
     unsigned int depth;
     unsigned long long expected;
@@ -178,8 +181,8 @@ bool Engine::perftSuite()
                   << "  " << c.fen << "\n";
     }
 
-    std::cout << (allPassed ? "perftsuite: ALL PASSED" : "perftsuite: FAILURES PRESENT") << " ("
-              << (getTime() - start) << " ms)" << std::endl;
+    std::cout << (allPassed ? "perftsuite: ALL PASSED" : "perftsuite: FAILURES PRESENT") << " (" << (getTime() - start)
+              << " ms)" << std::endl;
 
     board->setFen(START_FEN, &states[0]);
     return allPassed;
@@ -276,8 +279,8 @@ void Engine::eval()
 
             rank[0] += "-------+";
             rank[1] += "       |";
-            rank[2] += "   "+pieceToString(p)+"   |";
-            rank[3] += value+"|";
+            rank[2] += "   " + pieceToString(p) + "   |";
+            rank[3] += value + "|";
             rank[4] += "       |";
         }
         std::cout << rank[0] << "\n" << rank[1] << "\n" << rank[2] << "\n" << rank[3] << "\n" << rank[4] << "\n";

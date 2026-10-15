@@ -20,18 +20,15 @@ struct SearchNode
     SearchNode() : prev(nullptr)
     {
         staticEval = 0;
-        pvLine.len = 0;
     }
 
     SearchNode(SearchNode* parent) : prev(parent)
     {
         staticEval = 0;
-        pvLine.len = 0;
     }
 
     void ComputeAccumulator(const Board& board);
 
-    PVLine pvLine;
     Score staticEval;
 
     SearchNode* prev;

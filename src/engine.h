@@ -1,6 +1,7 @@
 #ifndef ENGINE_H
 #define ENGINE_H
 
+#include <deque>
 #include <iostream>
 
 #include "board.h"
@@ -99,7 +100,7 @@ class Engine
 
     Board* board;
     Searcher* searcher;
-    BoardState states[MAX_PLY + 1]; // plus 1 for starting point
+    std::deque<BoardState> states = std::deque<BoardState>(1);
 };
 
 #endif

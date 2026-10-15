@@ -390,6 +390,7 @@ Score Searcher::Search(int depth, int ply, Score alpha, Score beta, SearchNode* 
         staticEval = 0;
 
     node->staticEval = staticEval;
+    pvlines[ply].len = 0;
 
     if (!entry)
         ttOrStaticScore = node->staticEval;
@@ -507,6 +508,7 @@ Score Searcher::Search(int depth, int ply, Score alpha, Score beta, SearchNode* 
         }
 
         SearchNode child(node);
+
         Makemove(move, state, ply);
         ttable.Prefetch(board.getHash());
 
@@ -638,7 +640,7 @@ Score Searcher::Search(int depth, int ply, Score alpha, Score beta, SearchNode* 
 
                 if constexpr (isPVNode)
                 {
-                    UpdatePV(&node->pvLine, move, &child.pvLine);
+                    UpdatePV(&pvlines[ply], move, &pvlines[ply + 1]);
                 }
             }
             bestS = score;
@@ -646,7 +648,7 @@ Score Searcher::Search(int depth, int ply, Score alpha, Score beta, SearchNode* 
 
             if constexpr (isRootNode)
             {
-                info.pv = node->pvLine;
+                info.pv = pvlines[0];
                 info.bestmove = {bestM, bestS};
             }
         }

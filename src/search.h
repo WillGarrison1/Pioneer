@@ -11,9 +11,9 @@
 #include "move.h"
 #include "movegen.h"
 #include "nnue/accumulatorList.h"
+#include "searchInfo.h"
 #include "transposition.h"
 #include "types.h"
-#include "searchInfo.h"
 
 enum NodeType
 {
@@ -108,6 +108,8 @@ class Searcher
     // soft finishing the iteration it is in, but never past hard.
     unsigned long long softLimit;
     unsigned long long hardLimit;
+
+    PVLine pvlines[MAX_DEPTH];
 
     SearchInfo info;
     Board board;
