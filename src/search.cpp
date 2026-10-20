@@ -3,7 +3,6 @@
 #include <climits>
 #include <cmath>
 #include <cstring>
-#include <format>
 #include <iostream>
 
 #include "search.h"
@@ -14,6 +13,7 @@
 #include "profile.h"
 #include "time.h"
 #include "transposition.h"
+#include "types.h"
 
 #ifdef TUNING
 #include "tuning_params.h"
@@ -203,16 +203,26 @@ Score Searcher::QSearch(int ply, Score alpha, Score beta, SearchNode* node)
 
     Score originalAlpha = alpha;
     Score pat = 0;
+    Score rawEval = INVALID_SCORE;
 
     // Generate moves
 
     MoveList moves;
     if (!board.getNumChecks()) // If not in check, generate captures
     {
-        pat = Eval<FULL>(board, accumulators);
+        if (entry && entry->staticEval != INVALID_SCORE)
+            rawEval = entry->staticEval;
+        else
+            rawEval = Eval<FULL>(board, accumulators);
+        
+        pat = rawEval;
 
         if (pat >= beta)
+        {
+            if (!entry)
+                ttable.SetEntry(board.getHash(), rawEval, pat, 0, NodeBound::Lower, 0);
             return pat;
+        }
 
         if (alpha < pat)
             alpha = pat;
@@ -270,7 +280,7 @@ Score Searcher::QSearch(int ply, Score alpha, Score beta, SearchNode* node)
 
             if (score >= beta)
             {
-                ttable.SetEntry(board.getHash(), mateToTT(score, ply), 0, NodeBound::Lower, m);
+                ttable.SetEntry(board.getHash(), rawEval, mateToTT(score, ply), 0, NodeBound::Lower, m);
                 UPDATE_INFO_QBETACUT(info);
                 return score;
             }
@@ -281,7 +291,7 @@ Score Searcher::QSearch(int ply, Score alpha, Score beta, SearchNode* node)
         }
     }
     NodeBound bound = (pat >= beta) ? NodeBound::Lower : (pat > originalAlpha) ? NodeBound::Exact : NodeBound::Upper;
-    ttable.SetEntry(board.getHash(), mateToTT(pat, ply), 0, bound, bestM);
+    ttable.SetEntry(board.getHash(), rawEval, mateToTT(pat, ply), 0, bound, bestM);
 
     return pat;
 }
@@ -371,23 +381,28 @@ Score Searcher::Search(int depth, int ply, Score alpha, Score beta, SearchNode* 
 
             bestEntryMove = entry->move;
         }
-        else if constexpr (!isPVNode)
+        if constexpr (!isPVNode)
         {
 
             // Internal Iterative Reduction if no hashmove found (reduce depth by one)
-            depth -= depth > IIR_DEPTH;
+            depth -= depth > IIR_DEPTH && bestEntryMove.getMove() == 0;
         }
     }
 
     Score staticEval;
     bool inCheck = board.getNumChecks() > 0;
 
-    if (!inCheck)
-        staticEval = Eval<FULL>(board, accumulators);
-    else if (node->prev && node->prev->prev)
-        staticEval = node->prev->prev->staticEval;
+    if (inCheck)
+    {
+        if (node->prev && node->prev->prev && node->prev->prev->staticEval != INVALID_SCORE)
+            staticEval = node->prev->prev->staticEval;
+        else
+            staticEval = INVALID_SCORE;
+    }
+    else if (entry && entry->staticEval != INVALID_SCORE)
+        staticEval = entry->staticEval;
     else
-        staticEval = 0;
+        staticEval = Eval<FULL>(board, accumulators);
 
     node->staticEval = staticEval;
     pvlines[ply].len = 0;
@@ -441,7 +456,7 @@ Score Searcher::Search(int depth, int ply, Score alpha, Score beta, SearchNode* 
 
             if (depth < NULL_MOVE_VERIFY_DEPTH)
             {
-                ttable.SetEntry(board.getHash(), mateToTT(nullScore, ply), depth, NodeBound::Lower, 0);
+                ttable.SetEntry(board.getHash(), node->staticEval, mateToTT(nullScore, ply), depth, NodeBound::Lower, 0);
                 return nullScore;
             }
 
@@ -461,7 +476,7 @@ Score Searcher::Search(int depth, int ply, Score alpha, Score beta, SearchNode* 
         if (inCheck)         // if in check, then checkmate
             mateScore = -MATE + ply;
 
-        ttable.SetEntry(board.getHash(), mateToTT(mateScore, ply), depth, NodeBound::Exact, 0);
+        ttable.SetEntry(board.getHash(), node->staticEval, mateToTT(mateScore, ply), depth, NodeBound::Exact, 0);
         return mateScore;
     }
 
@@ -626,7 +641,7 @@ Score Searcher::Search(int depth, int ply, Score alpha, Score beta, SearchNode* 
                 addCapturePenalty(CapturedType(board, penaltyMove), penaltyMove, depth);
             }
 
-            ttable.SetEntry(board.getHash(), mateToTT(score, ply), depth, NodeBound::Lower, move);
+            ttable.SetEntry(board.getHash(), node->staticEval, mateToTT(score, ply), depth, NodeBound::Lower, move);
             UPDATE_INFO_BETACUT(info);
             UPDATE_INFO_BETACUTMOVE(info, i);
             return score;
@@ -682,7 +697,7 @@ Score Searcher::Search(int depth, int ply, Score alpha, Score beta, SearchNode* 
 
     if (isRunning.load(std::memory_order::memory_order_relaxed)) // don't store in transposition table if we cutoff
                                                                  // early (Time cutoff, node cutoff, etc.)
-        ttable.SetEntry(board.getHash(), mateToTT(bestS, ply), depth, nodeBound, bestM);
+        ttable.SetEntry(board.getHash(), node->staticEval, mateToTT(bestS, ply), depth, nodeBound, bestM);
 
     return bestS;
 }
@@ -750,7 +765,7 @@ void Searcher::IterativeDeepening(Board& board)
         {
             uint64_t time = getTime() - info.startTime;
             uint64_t nodes = info.numNodes + info.numQNodes;
-            uint64_t nps = nodes * 1000 / std::max(time, 1ull);
+            uint64_t nps = nodes * 1000 / std::max(time, static_cast<uint64_t>(1));
 
             std::cout << "info depth " << d << " seldepth " << info.seldepth + 1 << " currmove "
                       << info.bestmove.move.toString() << " " << ScoreToUCI(info.bestmove.score) << " nodes " << nodes

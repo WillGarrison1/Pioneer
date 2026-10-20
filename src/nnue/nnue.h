@@ -36,24 +36,29 @@ class NNUE
     float FastEvaluate(const Board& board, const Accumulator& us, const Accumulator& them) const;
 
     /**
+     * Adds the contribution of the given index to the accumulator
+     */
+    void AddInPlace(Accumulator& acc, int index) const;
+
+    /**
      * Adds the contribution of the given index to the accumulator.
      */
-    void Add(Accumulator& acc, int index) const;
+    void Add(Accumulator& toAcc, const Accumulator& fromAcc, int index) const;
 
     /**
      * Removes the contribution of the given index from the accumulator.
      */
-    void Sub(Accumulator& acc, int index) const;
+    void Sub(Accumulator& toAcc, const Accumulator& fromAcc, int index) const;
 
     /**
      * Adds and subtracts two indexes from the accumulator by removing the contribution of the old index and adding the
      * contribution of the new index.
      */
-    void AddSub(Accumulator& acc, int add, int sub) const;
+    void AddSub(Accumulator& toAcc, const Accumulator& fromAcc, int add, int sub) const;
 
-    void AddSubSub(Accumulator& acc, int add, int sub1, int sub2) const;
+    void AddSubSub(Accumulator& toAcc, const Accumulator& fromAcc, int add, int sub1, int sub2) const;
 
-    void AddAddSubSub(Accumulator& acc, int add1, int add2, int sub1, int sub2) const;
+    void AddAddSubSub(Accumulator& toAcc, const Accumulator& fromAcc, int add1, int add2, int sub1, int sub2) const;
 
     /**
      * Resets the accumulator to the initial state (only biases)

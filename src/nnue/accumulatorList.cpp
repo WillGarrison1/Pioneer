@@ -2,6 +2,7 @@
 
 #include "../board.h"
 #include "../piece.h"
+#include "accumulator.h"
 #include "nnue.h"
 
 AccumulatorList::AccumulatorList() : last(0)
@@ -14,177 +15,108 @@ AccumulatorList::~AccumulatorList()
     operator delete[](accumulators, std::align_val_t(64));
 }
 
-void AccumulatorList::ComputeAccumulator(const Board& board)
+template <Color POV>
+void AccumulatorList::ApplyDirtyMove(Accumulator &toAcc, const Accumulator &fromAcc, const DirtyMove &dirtyMove, Square king_sq)
 {
-    Square whiteKingSquare = lsb(board.getBB(WHITE, KING));
-    Square blackKingSquare = lsb(board.getBB(BLACK, KING));
-
-    int lastComputedBlack = last;
-    int lastComputedWhite = last;
-    bool needsFullRefreshBlack = false;
-
-    // check if full refresh is needed
-    while (lastComputedBlack >= 0 && !accumulators[lastComputedBlack].isBlackComputed && !needsFullRefreshBlack)
+    constexpr bool whitePOV = POV == WHITE;
+    if (dirtyMove.movePiece == EMPTY) // null-move
     {
-        needsFullRefreshBlack = accumulators[lastComputedBlack--].dirtyMove.movePiece == makePiece(KING, BLACK);
+        toAcc = fromAcc;
+        return;
     }
 
-    assert(lastComputedBlack >= 0);
+    Piece fromPiece, toPiece;
+    fromPiece = dirtyMove.movePiece;
 
-    auto& accumulatorNode = accumulators[last];
-    auto& blackComputed = accumulators[lastComputedBlack];
-
-    if (needsFullRefreshBlack)
+    if (dirtyMove.promote == EMPTY)
     {
-        board.ResetBlackAccumulator(accumulatorNode.blackAcc);
+        toPiece = fromPiece;
     }
     else
     {
-        /*
-            Possible optimization for "smart-updating" the nnue. It minimizes adds and removes.
-            Smartly updating the accumulator happens in two stages:
-            1. Add new dirty pieces to the accumulator
-            2. Remove old dirty pieces from the accumulator
-
-            The idea for computing follows these rules:
-            1. When coming across an untracked dirty piece (new dirty piece), we add it to the current accumulator.
-            Captured pieces will be treated as dirty pieces, but aren't added them to the accumulator
-            3. When coming across a tracked dirty piece, update it's position on the piece table so we can find it's
-           origin at the last computed accumulator
-            4. When reaching the previous computed accumulator, remove all the tracked pieces from the current
-           accumulator
-        */
-        Accumulator& acc = accumulatorNode.blackAcc;
-        acc = blackComputed.blackAcc;
-
-        int current = last;
-
-        while (current != lastComputedBlack)
-        {
-
-            const auto& dirtyMove = accumulators[current].dirtyMove;
-            if (dirtyMove.movePiece == EMPTY) // null-move
-            {
-                current--;
-                continue;
-            }
-
-            Piece fromPiece, toPiece;
-            fromPiece = dirtyMove.movePiece;
-
-            if (dirtyMove.promote == EMPTY)
-            {
-                toPiece = fromPiece;
-            }
-            else
-            {
-                toPiece = dirtyMove.promote;
-            }
-
-            int fromIndex = GetIndex(dirtyMove.from, blackKingSquare, fromPiece, false);
-            int toIndex = GetIndex(dirtyMove.to, blackKingSquare, toPiece, false);
-
-            if (dirtyMove.castleFrom != SQ_NONE)
-            {
-                Piece rook = makePiece(ROOK, getColor(fromPiece));
-                int castleFrom = GetIndex(dirtyMove.castleFrom, blackKingSquare, rook, false);
-                int castleTo = GetIndex(dirtyMove.castleTo, blackKingSquare, rook, false);
-                nnue->AddAddSubSub(acc, toIndex, castleTo, fromIndex, castleFrom);
-            }
-            else if (dirtyMove.capturedPiece != EMPTY)
-            {
-                int captureIndex = GetIndex(dirtyMove.captured, blackKingSquare, dirtyMove.capturedPiece, false);
-                nnue->AddSubSub(acc, toIndex, fromIndex, captureIndex);
-            }
-            else
-            {
-                nnue->AddSub(acc, toIndex, fromIndex);
-            }
-
-            current--;
-        }
+        toPiece = dirtyMove.promote;
     }
 
-    accumulatorNode.isBlackComputed = true;
+    int fromIndex = GetIndex(dirtyMove.from, king_sq, fromPiece, whitePOV);
+    int toIndex = GetIndex(dirtyMove.to, king_sq, toPiece, whitePOV);
 
-    bool needsFullRefreshWhite = false;
-
-    // check if full refresh is needed
-    while (lastComputedWhite >= 0 && !accumulators[lastComputedWhite].isWhiteComputed && !needsFullRefreshWhite)
+    if (dirtyMove.castleFrom != SQ_NONE)
     {
-        needsFullRefreshWhite = accumulators[lastComputedWhite--].dirtyMove.movePiece == makePiece(KING, WHITE);
+        Piece rook = makePiece(ROOK, getColor(fromPiece));
+        int castleFrom = GetIndex(dirtyMove.castleFrom, king_sq, rook, whitePOV);
+        int castleTo = GetIndex(dirtyMove.castleTo, king_sq, rook, whitePOV);
+        nnue->AddAddSubSub(toAcc, fromAcc, toIndex, castleTo, fromIndex, castleFrom);
     }
-
-    assert(lastComputedWhite >= 0);
-
-    auto& whiteComputed = accumulators[lastComputedWhite];
-
-    if (needsFullRefreshWhite)
+    else if (dirtyMove.capturedPiece != EMPTY)
     {
-        board.ResetWhiteAccumulator(accumulatorNode.whiteAcc);
+        int captureIndex = GetIndex(dirtyMove.captured, king_sq, dirtyMove.capturedPiece, whitePOV);
+        nnue->AddSubSub(toAcc, fromAcc, toIndex, fromIndex, captureIndex);
     }
     else
     {
-        Accumulator& acc = accumulatorNode.whiteAcc;
-        acc = whiteComputed.whiteAcc;
+        nnue->AddSub(toAcc, fromAcc, toIndex, fromIndex);
+    }
+}
 
-        int current = last;
+template <Color POV>
+void AccumulatorList::UpdateAccumulator(const Board &board)
+{
+    constexpr bool whitePOV = POV == WHITE;
+    constexpr Piece ourKing = makePiece(KING, POV);
 
-        while (current != lastComputedWhite)
-        {
+    AccumulatorNode* lastNode = &accumulators[last];
 
-            const auto& dirtyMove = accumulators[current].dirtyMove;
-            if (dirtyMove.movePiece == EMPTY) // null-move
-            {
-                current--;
-                continue;
-            }
+    if (lastNode->IsComputed<POV>())
+        return;
 
-            Piece fromPiece, toPiece;
-            fromPiece = dirtyMove.movePiece;
+    
 
-            if (dirtyMove.promote == EMPTY)
-            {
-                toPiece = fromPiece;
-            }
-            else
-            {
-                toPiece = dirtyMove.promote;
-            }
-
-            int fromIndex = GetIndex(dirtyMove.from, whiteKingSquare, fromPiece, true);
-            int toIndex = GetIndex(dirtyMove.to, whiteKingSquare, toPiece, true);
-
-            if (dirtyMove.castleFrom != SQ_NONE)
-            {
-                Piece rook = makePiece(ROOK, getColor(fromPiece));
-                int castleFrom = GetIndex(dirtyMove.castleFrom, whiteKingSquare, rook, true);
-                int castleTo = GetIndex(dirtyMove.castleTo, whiteKingSquare, rook, true);
-                nnue->AddAddSubSub(acc, toIndex, castleTo, fromIndex, castleFrom);
-            }
-            else if (dirtyMove.capturedPiece != EMPTY)
-            {
-                int captureIndex = GetIndex(dirtyMove.captured, whiteKingSquare, dirtyMove.capturedPiece, true);
-                nnue->AddSubSub(acc, toIndex, fromIndex, captureIndex);
-            }
-            else
-            {
-                nnue->AddSub(acc, toIndex, fromIndex);
-            }
-
-            current--;
+    
+    int start = last;
+    bool refresh = false;
+    while (start >= 0 && !refresh && !accumulators[start].IsComputed<POV>())
+        refresh = accumulators[start--].dirtyMove.movePiece == ourKing;
+    
+    if (refresh)
+    {
+        if constexpr (whitePOV)
+        {    
+            board.ResetWhiteAccumulator(accumulators[last].whiteAcc);
+            accumulators[last].isWhiteComputed = true;
         }
+        else
+        {    
+            board.ResetBlackAccumulator(accumulators[last].blackAcc);
+            accumulators[last].isBlackComputed = true;
+        }
+        return;
     }
 
-    accumulatorNode.isWhiteComputed = true;
+    assert(start>=0);
+    const Square kingSqr = lsb(board.getBB(POV, KING));
+    for (int i=start+1; i<=last; i++)
+    {
+        const Accumulator& prev = whitePOV ? accumulators[i - 1].whiteAcc : accumulators[i - 1].blackAcc;
+        Accumulator& cur = whitePOV ? accumulators[i].whiteAcc : accumulators[i].blackAcc;
+        ApplyDirtyMove<POV>(cur, prev, accumulators[i].dirtyMove, kingSqr);
+        (whitePOV ? accumulators[i].isWhiteComputed : accumulators[i].isBlackComputed) = true;
+    }
+}
 
-#ifdef VERIFY_ACCUMULATOR
+void AccumulatorList::ComputeAccumulators(const Board& board)
+{
+    UpdateAccumulator<WHITE>(board);
+    UpdateAccumulator<BLACK>(board);
+
+    #ifdef VERIFY_ACCUMULATOR
     Accumulator refWhite, refBlack;
     board.ResetWhiteAccumulator(refWhite);
     board.ResetBlackAccumulator(refBlack);
-    assert(std::memcmp(refWhite.data, accumulatorNode.whiteAcc.data, sizeof(refWhite.data)) == 0);
-    assert(std::memcmp(refBlack.data, accumulatorNode.blackAcc.data, sizeof(refBlack.data)) == 0);
-    assert(std::memcmp(refWhite.psqt, accumulatorNode.whiteAcc.psqt, sizeof(refWhite.psqt)) == 0);
-    assert(std::memcmp(refBlack.psqt, accumulatorNode.blackAcc.psqt, sizeof(refBlack.psqt)) == 0);
-#endif
+    assert(std::memcmp(refWhite.data, accumulators[last].whiteAcc.data, sizeof(refWhite.data)) == 0);
+    assert(std::memcmp(refBlack.data, accumulators[last].blackAcc.data, sizeof(refBlack.data)) == 0);
+    assert(std::memcmp(refWhite.psqt, accumulators[last].whiteAcc.psqt, sizeof(refWhite.psqt)) == 0);
+    assert(std::memcmp(refBlack.psqt, accumulators[last].blackAcc.psqt, sizeof(refBlack.psqt)) == 0);
+    #endif
+
 }
+

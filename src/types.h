@@ -158,6 +158,8 @@ typedef int Score;
 typedef uint64_t Bitboard;
 typedef uint64_t Key;
 
+constexpr Score INVALID_SCORE = -32768;
+
 // Forward declarations
 
 struct MoveList;
