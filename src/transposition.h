@@ -18,6 +18,7 @@ constexpr inline int GetAgeDiff(char currentAge, char targetAge)
 
 enum class NodeBound : unsigned char
 {
+    EMPTY=0,
     Exact,
     Upper,
     Lower
@@ -60,6 +61,11 @@ struct TranspositionEntry
 
         return points;
     }
+    inline bool isEmpty()
+    {
+        return getNodeBound() == NodeBound::EMPTY;
+    }
+    
 } __attribute__((packed));
 
 struct TranspositionBucket

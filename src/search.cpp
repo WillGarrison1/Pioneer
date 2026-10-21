@@ -168,7 +168,7 @@ Score Searcher::QSearch(int ply, Score alpha, Score beta, SearchNode* node)
 {
     PROFILE_FUNC();
     UPDATE_INFO_QNODES(info);
-
+    
     if (!isRunning.load(std::memory_order::memory_order_relaxed))
         return 0;
 
@@ -303,6 +303,9 @@ Score Searcher::Search(int depth, int ply, Score alpha, Score beta, SearchNode* 
     constexpr bool isRootNode = nodeT == RootNode;
     constexpr bool isCutNode = nodeT == CutNode;
 
+    if constexpr (isPVNode)
+        pvlines[ply].len = 0;
+
     if (!isRunning.load(std::memory_order::memory_order_relaxed))
         return 0;
 
@@ -389,7 +392,7 @@ Score Searcher::Search(int depth, int ply, Score alpha, Score beta, SearchNode* 
         }
     }
 
-    Score staticEval;
+    Score& staticEval = node->staticEval;
     bool inCheck = board.getNumChecks() > 0;
 
     if (inCheck)
@@ -404,8 +407,6 @@ Score Searcher::Search(int depth, int ply, Score alpha, Score beta, SearchNode* 
     else
         staticEval = Eval<FULL>(board, accumulators);
 
-    node->staticEval = staticEval;
-    pvlines[ply].len = 0;
 
     if (!entry)
         ttOrStaticScore = node->staticEval;

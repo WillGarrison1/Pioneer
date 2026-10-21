@@ -64,7 +64,7 @@ void AccumulatorList::UpdateAccumulator(const Board &board)
     constexpr bool whitePOV = POV == WHITE;
     constexpr Piece ourKing = makePiece(KING, POV);
 
-    AccumulatorNode* lastNode = &accumulators[last];
+    AccumulatorNode* lastNode = &Current();
 
     if (lastNode->IsComputed<POV>())
         return;
@@ -81,13 +81,13 @@ void AccumulatorList::UpdateAccumulator(const Board &board)
     {
         if constexpr (whitePOV)
         {    
-            board.ResetWhiteAccumulator(accumulators[last].whiteAcc);
-            accumulators[last].isWhiteComputed = true;
+            board.ResetWhiteAccumulator(Current().whiteAcc);
+            Current().isWhiteComputed = true;
         }
         else
         {    
-            board.ResetBlackAccumulator(accumulators[last].blackAcc);
-            accumulators[last].isBlackComputed = true;
+            board.ResetBlackAccumulator(Current().blackAcc);
+            Current().isBlackComputed = true;
         }
         return;
     }
@@ -112,10 +112,10 @@ void AccumulatorList::ComputeAccumulators(const Board& board)
     Accumulator refWhite, refBlack;
     board.ResetWhiteAccumulator(refWhite);
     board.ResetBlackAccumulator(refBlack);
-    assert(std::memcmp(refWhite.data, accumulators[last].whiteAcc.data, sizeof(refWhite.data)) == 0);
-    assert(std::memcmp(refBlack.data, accumulators[last].blackAcc.data, sizeof(refBlack.data)) == 0);
-    assert(std::memcmp(refWhite.psqt, accumulators[last].whiteAcc.psqt, sizeof(refWhite.psqt)) == 0);
-    assert(std::memcmp(refBlack.psqt, accumulators[last].blackAcc.psqt, sizeof(refBlack.psqt)) == 0);
+    assert(std::memcmp(refWhite.data, Current().whiteAcc.data, sizeof(refWhite.data)) == 0);
+    assert(std::memcmp(refBlack.data, Current().blackAcc.data, sizeof(refBlack.data)) == 0);
+    assert(std::memcmp(refWhite.psqt, Current().whiteAcc.psqt, sizeof(refWhite.psqt)) == 0);
+    assert(std::memcmp(refBlack.psqt, Current().blackAcc.psqt, sizeof(refBlack.psqt)) == 0);
     #endif
 
 }

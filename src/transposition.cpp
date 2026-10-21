@@ -58,7 +58,7 @@ TranspositionEntry* TranspositionTable::GetEntry(Key key)
 
     for (TranspositionEntry* entry = bucket->entries; entry < bucket->entries + BUCKET_SIZE; entry++)
     {
-        if (entry->key == intKey)
+        if (!entry->isEmpty() && entry->key == intKey)
         {
             return entry;
         }
@@ -77,7 +77,7 @@ void TranspositionTable::SetEntry(Key zobrist, Score staticEval, Score score, in
 
     for (TranspositionEntry& e : bucket->entries)
     {
-        if (!e.key) // just fill entry if empty
+        if (!e.isEmpty()) // just fill entry if empty
         {
             entry = &e;
             break;
@@ -123,7 +123,7 @@ float TranspositionTable::GetFull()
     for (unsigned long long i = 0; i < sample; i++)
     {
         for (TranspositionEntry& e : buckets[i].entries)
-            if (e.key)
+            if (!e.isEmpty())
                 valid++;
     }
 
