@@ -47,7 +47,7 @@ separate_arguments(PIONEER_PGO_EXTRA)
 set(PIONEER_RELEASE_FLAGS
     -O3 -march=native -mtune=native -flto -g -fno-exceptions
     -Wall -Wextra -Wcast-qual -mbmi2 -funroll-loops -fno-rtti)
-set(PIONEER_RELEASE_LINK -flto -static -pthread -lstdc++ -Wl,--no-as-needed)
+set(PIONEER_RELEASE_LINK -flto -static -pthread -lstdc++)
 
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
     add_compile_options(${PIONEER_RELEASE_FLAGS})

@@ -10,9 +10,10 @@ Key isBlackHash;
 Key castleRightsHash[16];
 Key enPassantHash[8];
 
-void TranspositionEntry::Set(Key key, Score score, Move move, unsigned char depth, unsigned char age, NodeBound bound)
+void TranspositionEntry::Set(Key key, Score staticEval, Score score, Move move, unsigned char depth, unsigned char age, NodeBound bound)
 {
-    this->key = key >> 32ULL;
+    this->key = key >> 48ULL;
+    this->staticEval = (int16_t)staticEval;
     this->score = (int16_t)score;
     this->move = move.getMove();
     this->depth = depth;
@@ -53,11 +54,11 @@ TranspositionEntry* TranspositionTable::GetEntry(Key key)
 {
     unsigned long long index = key & (this->numBuckets - 1);
     TranspositionBucket* bucket = &this->buckets[index];
-    uint32_t intKey = key >> 32ULL;
+    uint32_t intKey = key >> 48ULL;
 
     for (TranspositionEntry* entry = bucket->entries; entry < bucket->entries + BUCKET_SIZE; entry++)
     {
-        if (entry->key == intKey)
+        if (!entry->isEmpty() && entry->key == intKey)
         {
             return entry;
         }
@@ -66,7 +67,7 @@ TranspositionEntry* TranspositionTable::GetEntry(Key key)
     return nullptr;
 }
 
-void TranspositionTable::SetEntry(Key zobrist, Score score, int depth, NodeBound bound, Move bestMove)
+void TranspositionTable::SetEntry(Key zobrist, Score staticEval, Score score, int depth, NodeBound bound, Move bestMove)
 {
     unsigned long long index = zobrist & (this->numBuckets - 1); // much faster than modulo
     TranspositionBucket* bucket = &this->buckets[index];
@@ -76,13 +77,13 @@ void TranspositionTable::SetEntry(Key zobrist, Score score, int depth, NodeBound
 
     for (TranspositionEntry& e : bucket->entries)
     {
-        if (!e.key) // just fill entry if empty
+        if (!e.isEmpty()) // just fill entry if empty
         {
             entry = &e;
             break;
         }
 
-        if (e.key == zobrist >> 32ULL) // if we find the position in the table
+        if (e.key == zobrist >> 48ULL) // if we find the position in the table
         {
             e.setAge(age);
             if (depth < e.depth)
@@ -105,7 +106,7 @@ void TranspositionTable::SetEntry(Key zobrist, Score score, int depth, NodeBound
         }
     }
 
-    entry->Set(zobrist, score, bestMove, (unsigned char)depth, age, bound);
+    entry->Set(zobrist, staticEval, score, bestMove, (unsigned char)depth, age, bound);
 }
 
 float TranspositionTable::GetFull()
@@ -122,7 +123,7 @@ float TranspositionTable::GetFull()
     for (unsigned long long i = 0; i < sample; i++)
     {
         for (TranspositionEntry& e : buckets[i].entries)
-            if (e.key)
+            if (!e.isEmpty())
                 valid++;
     }
 

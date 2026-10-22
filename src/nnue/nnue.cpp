@@ -107,56 +107,81 @@ float NNUE::FastEvaluate(const Board& board, const Accumulator& us, const Accumu
     return psqt * 500.0f / 127.0f;
 }
 
-void NNUE::Add(Accumulator& acc, int add) const
+void NNUE::AddInPlace(Accumulator& acc, int add) const
+{
+    constexpr size_t dataSize = sizeof(Accumulator::data) / sizeof(Accumulator::data[0]);
+    constexpr size_t psqtSize = sizeof(Accumulator::psqt) / sizeof(Accumulator::psqt[0]);
+
+    int16_t* __restrict d = acc.data;
+    const int16_t* __restrict w = inputLayer.weights[add];
+    for (uint32_t i = 0; i < dataSize; i++)
+        d[i] += w[i];
+    for (uint32_t i = 0; i < psqtSize; i++)
+        acc.psqt[i] += w[i + dataSize];
+}
+
+void NNUE::Add(Accumulator& toAcc, const Accumulator& fromAcc, int add) const
 {
     constexpr size_t dataSize = sizeof(Accumulator::data) / sizeof(Accumulator::data[0]);
     constexpr size_t psqtSize = sizeof(Accumulator::psqt) / sizeof(Accumulator::psqt[0]);
 
     const int16_t* addW = inputLayer.weights[add];
+    int16_t* __restrict toData = toAcc.data; 
+    const int16_t* __restrict fromData = fromAcc.data; 
     for (uint32_t i = 0; i < dataSize; i++)
     {
-        acc.data[i] += addW[i];
+        toData[i] = fromData[i] + addW[i];
     }
+    int32_t* __restrict toPsqt = toAcc.psqt;
+    const int32_t* __restrict fromPsqt = fromAcc.psqt;
     for (uint32_t i = 0; i < psqtSize; i++)
     {
-        acc.psqt[i] += addW[i + dataSize];
+        toPsqt[i] = fromPsqt[i] + addW[i + dataSize];
     }
 }
 
-void NNUE::Sub(Accumulator& acc, int sub) const
+void NNUE::Sub(Accumulator& toAcc, const Accumulator& fromAcc, int sub) const
 {
     constexpr size_t dataSize = sizeof(Accumulator::data) / sizeof(Accumulator::data[0]);
     constexpr size_t psqtSize = sizeof(Accumulator::psqt) / sizeof(Accumulator::psqt[0]);
 
     const int16_t* subW = inputLayer.weights[sub];
+    int16_t* __restrict toData = toAcc.data; 
+    const int16_t* __restrict fromData = fromAcc.data; 
     for (uint32_t i = 0; i < dataSize; i++)
     {
-        acc.data[i] -= subW[i];
+        toData[i] = fromData[i] - subW[i];
     }
+    int32_t* __restrict toPsqt = toAcc.psqt;
+    const int32_t* __restrict fromPsqt = fromAcc.psqt;
     for (uint32_t i = 0; i < psqtSize; i++)
     {
-        acc.psqt[i] -= subW[i + dataSize];
+        toPsqt[i] = fromPsqt[i] - subW[i + dataSize];
     }
 }
 
-void NNUE::AddSub(Accumulator& acc, int add, int sub) const
+void NNUE::AddSub(Accumulator& toAcc, const Accumulator& fromAcc, int add, int sub) const
 {
     constexpr size_t dataSize = sizeof(Accumulator::data) / sizeof(Accumulator::data[0]);
     constexpr size_t psqtSize = sizeof(Accumulator::psqt) / sizeof(Accumulator::psqt[0]);
 
     const int16_t* addW = inputLayer.weights[add];
     const int16_t* subW = inputLayer.weights[sub];
+    int16_t* __restrict toData = toAcc.data; 
+    const int16_t* __restrict fromData = fromAcc.data; 
     for (uint32_t i = 0; i < dataSize; i++)
     {
-        acc.data[i] += addW[i] - subW[i];
+        toData[i] = fromData[i] + addW[i] - subW[i];
     }
+    int32_t* __restrict toPsqt = toAcc.psqt;
+    const int32_t* __restrict fromPsqt = fromAcc.psqt;
     for (uint32_t i = 0; i < psqtSize; i++)
     {
-        acc.psqt[i] += addW[i + dataSize] - subW[i + dataSize];
+        toPsqt[i] = fromPsqt[i] + addW[i + dataSize] - subW[i + dataSize];
     }
 }
 
-void NNUE::AddSubSub(Accumulator& acc, int add, int sub1, int sub2) const
+void NNUE::AddSubSub(Accumulator& toAcc, const Accumulator& fromAcc, int add, int sub1, int sub2) const
 {    
     constexpr size_t dataSize = sizeof(Accumulator::data) / sizeof(Accumulator::data[0]);
     constexpr size_t psqtSize = sizeof(Accumulator::psqt) / sizeof(Accumulator::psqt[0]);
@@ -164,17 +189,21 @@ void NNUE::AddSubSub(Accumulator& acc, int add, int sub1, int sub2) const
     const int16_t* addW = inputLayer.weights[add];
     const int16_t* sub1W = inputLayer.weights[sub1];
     const int16_t* sub2W = inputLayer.weights[sub2];
+    int16_t* __restrict toData = toAcc.data; 
+    const int16_t* __restrict fromData = fromAcc.data; 
     for (uint32_t i = 0; i < dataSize; i++)
     {
-        acc.data[i] += addW[i] - sub1W[i] - sub2W[i];
+        toData[i] = fromData[i] + addW[i] - sub1W[i] - sub2W[i];
     }
+    int32_t* __restrict toPsqt = toAcc.psqt;
+    const int32_t* __restrict fromPsqt = fromAcc.psqt;
     for (uint32_t i = 0; i < psqtSize; i++)
     {
-        acc.psqt[i] += addW[i + dataSize] - sub1W[i + dataSize] - sub2W[i + dataSize];
+        toPsqt[i] = fromPsqt[i] + addW[i + dataSize] - sub1W[i + dataSize] - sub2W[i + dataSize];
     }
 }
 
-void NNUE::AddAddSubSub(Accumulator& acc, int add1, int add2, int sub1, int sub2) const
+void NNUE::AddAddSubSub(Accumulator& toAcc, const Accumulator& fromAcc, int add1, int add2, int sub1, int sub2) const
 {
     constexpr size_t dataSize = sizeof(Accumulator::data) / sizeof(Accumulator::data[0]);
     constexpr size_t psqtSize = sizeof(Accumulator::psqt) / sizeof(Accumulator::psqt[0]);
@@ -183,13 +212,17 @@ void NNUE::AddAddSubSub(Accumulator& acc, int add1, int add2, int sub1, int sub2
     const int16_t* add2W = inputLayer.weights[add2];
     const int16_t* sub1W = inputLayer.weights[sub1];
     const int16_t* sub2W = inputLayer.weights[sub2];
+    int16_t* __restrict toData = toAcc.data; 
+    const int16_t* __restrict fromData = fromAcc.data; 
     for (uint32_t i = 0; i < dataSize; i++)
     {
-        acc.data[i] += add1W[i] + add2W[i] - sub1W[i] - sub2W[i];
+        toData[i] = fromData[i] + add1W[i] + add2W[i] - sub1W[i] - sub2W[i];
     }
+    int32_t* __restrict toPsqt = toAcc.psqt;
+    const int32_t* __restrict fromPsqt = fromAcc.psqt;
     for (uint32_t i = 0; i < psqtSize; i++)
     {
-        acc.psqt[i] += add1W[i + dataSize] + add2W[i + dataSize] - sub1W[i + dataSize] - sub2W[i + dataSize];
+        toPsqt[i] = fromPsqt[i] + add1W[i + dataSize] + add2W[i + dataSize] - sub1W[i + dataSize] - sub2W[i + dataSize];
     }
 }
 

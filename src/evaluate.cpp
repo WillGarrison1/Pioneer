@@ -236,7 +236,7 @@ Score Eval<FULL>(Board& board, AccumulatorList& list)
     return score * (board.whiteToMove ? 1 : -1);
 #else
 
-    list.ComputeAccumulator(board);
+    list.ComputeAccumulators(board);
 
     auto& node = list.Current();
 
@@ -260,7 +260,7 @@ Score Eval<FAST>(Board& board, AccumulatorList& list)
     return score * (board.whiteToMove ? 1 : -1);
 #else
 
-    list.ComputeAccumulator(board);
+    list.ComputeAccumulators(board);
 
     auto& node = list.Current();
 

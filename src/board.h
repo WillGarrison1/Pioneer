@@ -23,11 +23,11 @@ struct BoardState
     Bitboard attacks[2]; // the attacks a side has (white = 0 black = 1)
     Bitboard checkers;
     Key zobristHash;
+    Move move; // Move that led to this board state
     Piece captured;
     Piece moved;
 
     CastlingRights castling;       // Castling rights
-    Move move;                     // Move that led to this board state
     unsigned char enPassantSquare; // En passant square
     unsigned char repetition;
     unsigned char move50rule;

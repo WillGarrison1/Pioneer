@@ -615,7 +615,7 @@ void Board::ResetWhiteAccumulator(Accumulator& whiteAcc) const
             Square sqr = popLSB(bb);
             Piece piece = board[sqr];
             int whiteIndex = GetIndex(sqr, whiteKingSquare, piece, true);
-            nnue->Add(whiteAcc, whiteIndex);
+            nnue->AddInPlace(whiteAcc, whiteIndex);
         }
     }
 }
@@ -632,7 +632,7 @@ void Board::ResetBlackAccumulator(Accumulator& blackAcc) const
             Square sqr = popLSB(bb);
             Piece piece = board[sqr];
             int blackIndex = GetIndex(sqr, blackKingSquare, piece, false);
-            nnue->Add(blackAcc, blackIndex);
+            nnue->AddInPlace(blackAcc, blackIndex);
         }
     }
 }

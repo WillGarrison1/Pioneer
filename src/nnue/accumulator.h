@@ -36,6 +36,12 @@ struct AccumulatorNode
         isBlackComputed = isWhiteComputed = false;
         dirtyMove.movePiece = EMPTY;
     }
+
+    template <Color POV> 
+    inline bool IsComputed() const
+    {
+        return POV == WHITE ? isWhiteComputed : isBlackComputed;
+    }
 };
 
 #endif
