@@ -1,5 +1,7 @@
 #include "MoveSort.h"
+#include "PieceTable.h"
 #include "magic.h"
+
 
 alignas(64) Move killerMoves[MAX_PLY][2]; // each ply can have two killer moves
 alignas(64) Move counterMove[64][64];

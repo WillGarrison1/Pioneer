@@ -3,7 +3,6 @@
 #include <climits>
 #include <cmath>
 #include <cstring>
-#include <format>
 #include <iostream>
 
 #include "search.h"

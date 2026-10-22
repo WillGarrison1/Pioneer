@@ -2,10 +2,11 @@
 #define ENGINE_H
 
 #include <deque>
-#include <iostream>
 
 #include "board.h"
+#include "option.h"
 #include "search.h"
+#include <vector>
 
 /**
  * @brief Raw `go` arguments as sent by the GUI, before they are resolved for the side to move.
@@ -44,13 +45,14 @@ class Engine
         board->setFen(fen, &states[0]);
     }
 
+    void SetOption(const std::string& name, const std::string& value);
+    std::vector<Option*>& GetOptions()
+    {
+        return options;
+    }
+
     void go(const GoParams& params);
     void goPerft(unsigned int depth);
-
-    /**
-     * @brief Resizes the transposition table. @param megabytes new size in MB.
-     */
-    void SetHashSize(unsigned int megabytes);
 
     /**
      * @brief Fixed-depth search over a fixed position set; prints "<N> nodes <M> nps".
@@ -98,9 +100,16 @@ class Engine
         searcher->WaitForSearch();
     }
 
+    /**
+     * @brief Resizes the transposition table. @param megabytes new size in MB.
+     */
+    void SetHashSize(unsigned int megabytes);
+
     Board* board;
     Searcher* searcher;
     std::deque<BoardState> states = std::deque<BoardState>(1);
+
+    std::vector<Option*> options;
 };
 
 #endif

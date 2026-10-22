@@ -1,7 +1,5 @@
 #include "uci.h"
 
-#include "search.h"
-#include "transposition.h"
 #include "types.h"
 #include <iostream>
 #include <sstream>
@@ -35,11 +33,16 @@ void Interface::run()
             break;
 
         else if (input == "uci")
+        {
             std::cout << "id name PioneerV4.1\n"
-                      << "id author Pioneer\n"
-                      << "option name Hash type spin default 64 min 1 max 4096\n"
-                      << "uciok" << std::endl;
+                      << "id author Will Garrison\n";
 
+            auto& options = engine.GetOptions();
+            for (Option* option : options)
+                std::cout << *option;
+
+            std::cout << "uciok" << std::endl;
+        }
         else if (word == "setoption")
         {
             // setoption name <id> [value <x>]
@@ -54,8 +57,7 @@ void Interface::run()
                         value += (value.empty() ? "" : " ") + word;
             }
 
-            if (name == "Hash")
-                engine.SetHashSize(atoi(value.c_str()));
+            engine.SetOption(name, value);
         }
 
         else if (input == "isready")

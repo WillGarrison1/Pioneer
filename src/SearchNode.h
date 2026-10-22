@@ -2,7 +2,6 @@
 #define SEARCH_NODE_H
 
 #include "move.h"
-#include "nnue/accumulator.h"
 #include <cstdint>
 
 struct PVLine

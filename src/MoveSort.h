@@ -1,11 +1,10 @@
 #ifndef MOVE_SORT_H
 #define MOVE_SORT_H
 
-#include "PieceTable.h"
-#include "bitboard.h"
 #include "board.h"
-#include "color.h"
+#include "evaluate.h"
 #include "move.h"
+
 
 #if TUNING
 #include "tuning_params.h"

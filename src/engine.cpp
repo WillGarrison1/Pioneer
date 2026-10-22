@@ -1,13 +1,11 @@
-#include <chrono>
 #include <iostream>
 
 #include "MoveSort.h"
 #include "direction.h"
 #include "engine.h"
-#include "evaluate.h"
 #include "move.h"
-#include "movegen.h"
 #include "nnue/nnue.h"
+#include "option.h"
 #include "perft.h"
 #include "platform.h"
 #include "search.h"
@@ -23,6 +21,9 @@ Engine::Engine()
     initBBs();
     InitZobrist();
     InitMagics();
+
+    options.push_back(new SpinOption("Hash", 1, 256, 16, [&](int mb) { this->SetHashSize(mb); }));
+    options.push_back(new SpinOption("Threads", 1, 1, 1, [](int) {}));
 
     std::memset(moveHistory, 0, sizeof(moveHistory));
 
@@ -82,6 +83,20 @@ void Engine::go(const GoParams& params)
     constraints.infinite = params.infinite;
     constraints.quiet = false;
     searcher->StartSearch(*board, constraints);
+}
+
+void Engine::SetOption(const std::string &name, const std::string &value)
+{
+    for (Option* option : options)
+    {
+        if (option->GetName() == name)
+        {
+            option->Set(value);
+            return;
+        }
+    }
+
+    std::cout << "info string no option with name " << name;
 }
 
 void Engine::SetHashSize(unsigned int megabytes)
