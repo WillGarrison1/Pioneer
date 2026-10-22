@@ -172,6 +172,12 @@ Score Searcher::QSearch(int ply, Score alpha, Score beta, SearchNode* node)
     if (!isRunning.load(std::memory_order::memory_order_relaxed))
         return 0;
 
+    if (((info.numNodes + info.numQNodes) & 2047ULL) == 0 && getTime() - info.startTime > hardLimit)
+    {
+        isRunning = false;
+        return 0;
+    }
+
     // QSearch recurses into itself and never re-enters Search, so these have to be repeated here.
     // The draw checks in particular matter: when in check we generate ALL_MOVES (including quiets),
     // so a perpetual-check sequence has no other terminating condition.
@@ -307,7 +313,7 @@ Score Searcher::Search(int depth, int ply, Score alpha, Score beta, SearchNode* 
     if (!isRunning.load(std::memory_order::memory_order_relaxed))
         return 0;
 
-    if ((info.numNodes & 2047ULL) == 0 && getTime() - info.startTime > hardLimit)
+    if (((info.numNodes + info.numQNodes) & 2047ULL) == 0 && getTime() - info.startTime > hardLimit)
     {
         isRunning = false;
         return 0;
@@ -868,7 +874,7 @@ void Searcher::ComputeMovetime()
     }
 
     // Reserve a small buffer so we never flag on the way back through the GUI.
-    constexpr unsigned long long OVERHEAD = 20;
+    constexpr unsigned long long OVERHEAD = 35;
     const unsigned long long remaining =
         constraints.remainingTime > OVERHEAD ? constraints.remainingTime - OVERHEAD : 1;
     const unsigned long long inc = constraints.increment;
@@ -927,23 +933,37 @@ void Searcher::DoSearch()
         info.rootMoves.Add(RootMove{*i, 0});
     }
 
-    constraints.multiPV = std::min((unsigned int)info.rootMoves.numRoots, constraints.multiPV);
-
-    ComputeMovetime();
-
-    ttable.IncrementAge();
-    IterativeDeepening(board);
-
-    if (!constraints.quiet)
+    if (info.rootMoves.numRoots == 0) // check if we're in mate or stalemate
     {
-        // A search stopped before finishing depth 1 has no best move; never send a null bestmove.
-        if (info.bestmove.move.getMove() == 0 && info.rootMoves.numRoots > 0)
-            info.bestmove.move = info.rootMoves[0].move;
-        std::cout << "bestmove " << info.bestmove.move.toString() << std::endl;
+        int score = 0;
+        if (board.getNumChecks() > 0)
+            score = -MATE;
+
+        std::cout << "info depth 0 " << ScoreToUCI(score) << "\n";
+        std::cout << "bestmove (none)" << std::endl;
+    }
+    else
+    {
+
+        constraints.multiPV = std::clamp(constraints.multiPV, 1u, (unsigned int)info.rootMoves.numRoots);
+
+        ComputeMovetime();
+
+        ttable.IncrementAge();
+        IterativeDeepening(board);
+
+        if (!constraints.quiet)
+        {
+            // A search stopped before finishing depth 1 has no best move; never send a null bestmove.
+            if (info.bestmove.move.getMove() == 0 && info.rootMoves.numRoots > 0)
+                info.bestmove.move = info.rootMoves[0].move;
+
+            std::cout << "bestmove " << info.bestmove.move.toString() << std::endl;
 
 #ifdef SEARCHINFO
-        PrintDebugInfo(info);
+            PrintDebugInfo(info);
 #endif
+        }
     }
 
     Stop();
