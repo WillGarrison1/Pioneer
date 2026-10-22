@@ -68,7 +68,7 @@ struct SearchInfo
 
     RootMoveList rootMoves;
     RootMove bestmove;
-    PVLine pv;
+    PVLine multiPVLines[256];
 };
 
 inline void PrintDebugInfo(SearchInfo& info)

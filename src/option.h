@@ -8,6 +8,8 @@
 class Option
 {
   public:
+    virtual ~Option() {};
+
     inline const std::string& GetName() const
     {
         return name;
@@ -19,9 +21,6 @@ class Option
     }
 
     virtual void Set(const std::string& input) = 0;
-
-    template <typename T>
-    T GetValue();
 
   protected:
     virtual std::string AsString() const = 0;
@@ -37,7 +36,7 @@ class SpinOption : public Option
     {
         this->name = name;
     }
-    ~SpinOption() = default;
+    ~SpinOption() override = default;
 
     friend std::ostream& operator<<(std::ostream& os, const Option& option);
 
@@ -68,7 +67,7 @@ class CheckOption : public Option
         this->name = name;
     }
 
-    ~CheckOption() = default;
+    ~CheckOption() override = default;
 
     void Set(const std::string& input) override;
 
@@ -96,7 +95,7 @@ class StringOption : protected Option
         this->name = name;
     }
 
-    ~StringOption() = default;
+    ~StringOption() override = default;
 
     friend std::ostream& operator<<(std::ostream& os, const Option& option);
     void Set(const std::string& input) override;

@@ -15,7 +15,7 @@ import sys
 import time
 from pathlib import Path
 
-DEFAULT_ENGINE = Path(__file__).resolve().parent.parent / "build" / "PioneerV4.exe"
+DEFAULT_ENGINE = Path(__file__).resolve().parent.parent / "build" / "Pioneer.exe"
 
 
 class Engine:

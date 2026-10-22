@@ -34,7 +34,7 @@ void Interface::run()
 
         else if (input == "uci")
         {
-            std::cout << "id name PioneerV4.1\n"
+            std::cout << "id name Pioneer 5\n"
                       << "id author Will Garrison\n";
 
             auto& options = engine.GetOptions();

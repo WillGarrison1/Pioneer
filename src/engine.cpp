@@ -13,6 +13,7 @@
 #include "time.h"
 #include "transposition.h"
 #include <cstring>
+#include <type_traits>
 
 Engine::Engine()
 {
@@ -24,6 +25,7 @@ Engine::Engine()
 
     options.push_back(new SpinOption("Hash", 1, 256, 16, [&](int mb) { this->SetHashSize(mb); }));
     options.push_back(new SpinOption("Threads", 1, 1, 1, [](int) {}));
+    options.push_back(new SpinOption("MultiPV", 1, 256, 1, [](int) {}));
 
     std::memset(moveHistory, 0, sizeof(moveHistory));
 
@@ -46,6 +48,8 @@ Engine::~Engine()
 {
     delete board;
     delete searcher;
+    for (Option* option : options)
+        delete option;
 }
 
 void Engine::makemove(Move move)
@@ -74,6 +78,7 @@ void Engine::makemove(Move move)
 void Engine::go(const GoParams& params)
 {
     SearchConstraints constraints{};
+    constraints.multiPV = GetOption<SpinOption>("MultiPV")->GetValue();
     constraints.maxDepth = params.depth;
     constraints.maxNodes = params.nodes;
     constraints.movetime = params.movetime;
@@ -85,7 +90,7 @@ void Engine::go(const GoParams& params)
     searcher->StartSearch(*board, constraints);
 }
 
-void Engine::SetOption(const std::string &name, const std::string &value)
+void Engine::SetOption(const std::string& name, const std::string& value)
 {
     for (Option* option : options)
     {
@@ -97,6 +102,20 @@ void Engine::SetOption(const std::string &name, const std::string &value)
     }
 
     std::cout << "info string no option with name " << name;
+}
+
+template <typename OptionType>
+OptionType* Engine::GetOption(const std::string& name)
+{
+    static_assert(std::is_base_of_v<Option, OptionType>, "OptionType must derive Option");
+    for (Option* option : options)
+    {
+        if (option->GetName() == name)
+            return reinterpret_cast<OptionType*>(option);
+    }
+
+    std::cerr << "Unable to find option with name " << name << std::endl;
+    return nullptr;
 }
 
 void Engine::SetHashSize(unsigned int megabytes)

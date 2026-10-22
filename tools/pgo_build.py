@@ -129,7 +129,7 @@ def build(build_dir, jobs):
 
 
 def engine_path(build_dir):
-    for name in ("PioneerV4.exe", "PioneerV4"):
+    for name in ("Pioneer.exe", "Pioneer"):
         p = build_dir / name
         if p.exists():
             return p

@@ -136,7 +136,7 @@ def build_engine(params: list[Param], output_name: str):
         check=True,
         capture_output=True,
     )
-    shutil.copy("out/build/Release/PioneerV4.exe", output_name)
+    shutil.copy("out/build/Release/Pioneer.exe", output_name)
 
 
 def main():

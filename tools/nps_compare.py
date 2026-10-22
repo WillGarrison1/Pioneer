@@ -62,7 +62,7 @@ def bench_once(exe: Path, depth: int, cpu: int, timeout: int = 900):
 
 
 def find_exe(build_dir: Path) -> Path:
-    for name in ("PioneerV4.exe", "PioneerV4"):
+    for name in ("Pioneer.exe", "Pioneer"):
         p = build_dir / name
         if p.exists():
             return p.resolve()

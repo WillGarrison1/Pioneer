@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(PioneerV4 VERSION 0.1.0 LANGUAGES C CXX)
+project(Pioneer VERSION 0.1.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -23,21 +23,12 @@ file(GLOB_RECURSE SOURCES "src/*.cpp")
 # slow to reach the depths where those invariants actually get stressed.
 option(PIONEER_ASSERTS "Optimized build with asserts enabled" OFF)
 
-# Profile-guided optimization. PGO is a *two-stage* process:
+# Profile-guided optimization. PGO is a two-stage process:
 #   1. GENERATE -- build an instrumented binary, run a representative workload (`bench`), which
 #      writes profile counters to disk on clean exit.
 #   2. USE      -- rebuild feeding those counters back in, so the compiler knows which branches
 #      are hot, what to inline, and how to lay out code.
-# Building only with -fprofile-generate produces a *slower* binary and no speedup; the win comes
-# entirely from the second stage. Use tools/pgo_build.py to drive both stages.
-#
-# NOTE: GCC is given no profile directory on purpose. With -fprofile-generate=DIR, MinGW GCC
-# mangles the object path one way when *writing* .gcda files (DIR/C~/Users/.../x.cpp.gcda) and
-# another way when *reading* them (DIR\C~\...\CMakeFiles#PioneerV4.dir#src#x.cpp.obj.gcda), so
-# the USE stage found no profile for any file. Functions without profile data are then treated as
-# cold and optimized for size, which made the "PGO" binary slower than plain Release. Without a
-# directory, each .gcda sits next to its object file and both stages agree on the name. This also
-# means both stages must run in the SAME build directory.
+
 set(PIONEER_PGO "OFF" CACHE STRING "PGO stage: OFF, GENERATE, or USE")
 set_property(CACHE PIONEER_PGO PROPERTY STRINGS OFF GENERATE USE)
 set(PIONEER_PGO_DIR "${CMAKE_BINARY_DIR}/pgo-data" CACHE PATH "Where Clang PGO profile data lives")
@@ -94,11 +85,11 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
     endif()
 endif()
 
-add_executable(PioneerV4 ${SOURCES})
+add_executable(Pioneer ${SOURCES})
 
 file(GLOB NNUE_BIN_FILES "${CMAKE_SOURCE_DIR}/src/nnue/bin/*")
 
-add_custom_command(TARGET PioneerV4 POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:PioneerV4>/nnue_bin
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${NNUE_BIN_FILES} $<TARGET_FILE_DIR:PioneerV4>/nnue_bin
+add_custom_command(TARGET Pioneer POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:Pioneer>/nnue_bin
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${NNUE_BIN_FILES} $<TARGET_FILE_DIR:Pioneer>/nnue_bin
 )

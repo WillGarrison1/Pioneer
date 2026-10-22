@@ -46,6 +46,10 @@ class Engine
     }
 
     void SetOption(const std::string& name, const std::string& value);
+
+    template <typename OptionType>
+    OptionType* GetOption(const std::string& name);
+
     std::vector<Option*>& GetOptions()
     {
         return options;

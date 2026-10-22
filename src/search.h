@@ -24,6 +24,9 @@ enum NodeType
 
 struct SearchConstraints
 {
+
+    unsigned int multiPV;
+
     // if any of these values are 0, treat them as infinite
 
     // maximum depth
