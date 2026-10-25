@@ -29,6 +29,7 @@ option(PIONEER_ASSERTS "Optimized build with asserts enabled" OFF)
 #   2. USE      -- rebuild feeding those counters back in, so the compiler knows which branches
 #      are hot, what to inline, and how to lay out code.
 
+
 set(PIONEER_PGO "OFF" CACHE STRING "PGO stage: OFF, GENERATE, or USE")
 set_property(CACHE PIONEER_PGO PROPERTY STRINGS OFF GENERATE USE)
 set(PIONEER_PGO_DIR "${CMAKE_BINARY_DIR}/pgo-data" CACHE PATH "Where Clang PGO profile data lives")
@@ -38,8 +39,13 @@ separate_arguments(PIONEER_PGO_EXTRA)
 set(PIONEER_RELEASE_FLAGS
     -O3 -march=native -mtune=native -flto -g -fno-exceptions
     -Wall -Wextra -Wcast-qual -mbmi2 -funroll-loops -fno-rtti)
-set(PIONEER_RELEASE_LINK -flto -static -pthread -lstdc++)
 
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+
+set(PIONEER_RELEASE_LINK -flto -static -lstdc++)
+elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+set(PIONEER_RELEASE_LINK -flto -static -lstdc++ -fuse-ld=lld)
+endif()
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
     add_compile_options(${PIONEER_RELEASE_FLAGS})
     if(NOT PIONEER_ASSERTS)
@@ -85,7 +91,11 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
     endif()
 endif()
 
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+find_package(Threads REQUIRED)
+
 add_executable(Pioneer ${SOURCES})
+target_link_libraries(Pioneer PRIVATE Threads::Threads)
 
 file(GLOB NNUE_BIN_FILES "${CMAKE_SOURCE_DIR}/src/nnue/bin/*")
 

@@ -33,7 +33,7 @@
 // qsearch that runs on top of the deepest main-search ply.
 constexpr int PLY_LIMIT = MAX_DEPTH - 8;
 
-constexpr auto lmrTable = [] {
+const auto lmrTable = [] {
     std::array<std::array<int, 256>, MAX_DEPTH> table{};
     for (int d = 0; d < MAX_DEPTH; d++)
     {
