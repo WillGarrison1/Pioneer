@@ -874,9 +874,8 @@ void Searcher::ComputeMovetime()
     }
 
     // Reserve a small buffer so we never flag on the way back through the GUI.
-    constexpr unsigned long long OVERHEAD = 35;
     const unsigned long long remaining =
-        constraints.remainingTime > OVERHEAD ? constraints.remainingTime - OVERHEAD : 1;
+        constraints.remainingTime > constraints.moveOverhead ? constraints.remainingTime - constraints.moveOverhead : 1;
     const unsigned long long inc = constraints.increment;
 
     unsigned long long soft;

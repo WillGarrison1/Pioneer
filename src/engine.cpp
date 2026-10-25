@@ -26,6 +26,7 @@ Engine::Engine()
     options.push_back(new SpinOption("Hash", 1, 256, 16, [&](int mb) { this->SetHashSize(mb); }));
     options.push_back(new SpinOption("Threads", 1, 1, 1, [](int) {}));
     options.push_back(new SpinOption("MultiPV", 1, 256, 1, [](int) {}));
+    options.push_back(new SpinOption("Move Overhead", 1, 1000, 35, [](int) {}));
 
     std::memset(moveHistory, 0, sizeof(moveHistory));
 
@@ -78,6 +79,7 @@ void Engine::makemove(Move move)
 void Engine::go(const GoParams& params)
 {
     SearchConstraints constraints{};
+    constraints.moveOverhead = GetOption<SpinOption>("Move Overhead")->GetValue();
     constraints.multiPV = GetOption<SpinOption>("MultiPV")->GetValue();
     constraints.maxDepth = params.depth;
     constraints.maxNodes = params.nodes;
