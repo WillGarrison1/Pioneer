@@ -303,11 +303,12 @@ Score Searcher::QSearch(int ply, Score alpha, Score beta, SearchNode* node)
 }
 
 template <NodeType nodeT>
-Score Searcher::Search(int depth, int ply, Score alpha, Score beta, SearchNode* node, const bool nullMoveAllowed)
+Score Searcher::Search(int depth, int ply, Score alpha, Score beta, SearchNode* node, const bool nullMoveAllowed,
+                       bool cutNode)
 {
     constexpr bool isPVNode = nodeT == PVNode || nodeT == RootNode;
     constexpr bool isRootNode = nodeT == RootNode;
-    constexpr bool isCutNode = nodeT == CutNode;
+    constexpr bool isNonPV = nodeT == NonPVNode;
 
     // step 1. check for stopping conditions
     if (!isRunning.load(std::memory_order::memory_order_relaxed))
@@ -370,7 +371,7 @@ Score Searcher::Search(int depth, int ply, Score alpha, Score beta, SearchNode* 
             entry->setAge(ttable.GetAge()); // reset the age for this node
 
             UPDATE_INFO_TTHIT(info);
-            if constexpr (!isPVNode)
+            if constexpr (isNonPV)
             {
                 if (entry->depth >= depth)
                 {
@@ -397,7 +398,7 @@ Score Searcher::Search(int depth, int ply, Score alpha, Score beta, SearchNode* 
 
             bestEntryMove = entry->move;
         }
-        if constexpr (!isPVNode)
+        if constexpr (isNonPV)
         {
 
             // Internal Iterative Reduction if no hashmove found (reduce depth by one)
@@ -425,7 +426,7 @@ Score Searcher::Search(int depth, int ply, Score alpha, Score beta, SearchNode* 
         ttOrStaticScore = node->staticEval;
 
     // step 6. reverse futility pruning
-    if (!isPVNode && !inCheck && depth <= REVERSE_FUTILITY_MAX_DEPTH)
+    if (isNonPV && !inCheck && depth <= REVERSE_FUTILITY_MAX_DEPTH)
     {
         Score margin = REVERSE_FUTILITY_MULTI * depth;
 
@@ -436,7 +437,7 @@ Score Searcher::Search(int depth, int ply, Score alpha, Score beta, SearchNode* 
     }
 
     // step 7. razoring
-    if (!isPVNode && !inCheck && depth <= RAZORING_DEPTH)
+    if (isNonPV && !inCheck && depth <= RAZORING_DEPTH)
     {
         Score margin = RAZORING_OFFSET + (RAZORING_MULTI * depth);
 
@@ -451,14 +452,14 @@ Score Searcher::Search(int depth, int ply, Score alpha, Score beta, SearchNode* 
     BoardState state;
 
     int numOurPieces = popCount(board.getBB(board.sideToMove, ALL_PIECES) & ~board.getBB(PAWN));
-    if (!isPVNode && numOurPieces > 0 && !inCheck && depth >= NULL_DEPTH && !isLoss(beta) && nullMoveAllowed &&
+    if (isNonPV && numOurPieces > 2 && !inCheck && depth >= NULL_DEPTH && !isLoss(beta) && nullMoveAllowed &&
         staticEval >= beta)
     {
         int newDepth = depth * NULL_MOVE_DEPTH_MULTI - NULL_MOVE_DEPTH_OFFSET;
 
         SearchNode nullNode(node);
         MakeNullmove(state, ply);
-        Score nullScore = -Search<CutNode>(newDepth, ply + 1, -beta, -beta + 1, &nullNode);
+        Score nullScore = -Search<NonPVNode>(newDepth, ply + 1, -beta, -beta + 1, &nullNode, false, !cutNode);
         UndoNullmove(ply);
         if (nullScore >= beta)
         {
@@ -475,10 +476,11 @@ Score Searcher::Search(int depth, int ply, Score alpha, Score beta, SearchNode* 
 
             // verify null search
             SearchNode verifyNode(node);
-            Score score = Search<CutNode>(newDepth, ply, beta - 1, beta, &verifyNode, false);
+            Score score = Search<NonPVNode>(newDepth, ply, beta - 1, beta, &verifyNode, false, cutNode);
             if (score >= beta)
                 return nullScore;
         }
+        cutNode = false;
     }
 
     // step 9. generate moves
@@ -536,7 +538,7 @@ Score Searcher::Search(int depth, int ply, Score alpha, Score beta, SearchNode* 
         }
 
         // step 12. late move pruning
-        if (!isPVNode && !inCheck && move.isType<QUIET>())
+        if (isNonPV && !inCheck && move.isType<QUIET>())
         {
             if (lmpCount++ >= lmpThreshold) // lmp
                 continue;
@@ -551,7 +553,7 @@ Score Searcher::Search(int depth, int ply, Score alpha, Score beta, SearchNode* 
         //     extension = 1;
 
         // step 14. Futility pruning
-        if (!isPVNode && !inCheck && depth < FUTILITY_DEPTH && move.type() == QUIET && !checkMove)
+        if (isNonPV && !inCheck && depth < FUTILITY_DEPTH && move.type() == QUIET && !checkMove)
         {
             Score eval = ttOrStaticScore + FUTILITY_MARGIN(depth);
             if (eval <= alpha)
@@ -581,7 +583,7 @@ Score Searcher::Search(int depth, int ply, Score alpha, Score beta, SearchNode* 
             {
                 if (move.isType<QUIET>())
                 {
-                    reductions = LMRReduction(depth, i) + isCutNode;
+                    reductions = LMRReduction(depth, i) + cutNode;
                 }
                 else if (sorter.currentBucketNum == MoveSorter::BAD_CAPTURE)
                     reductions = std::max(LMRReduction(depth, i) - 1, 0);
@@ -589,8 +591,8 @@ Score Searcher::Search(int depth, int ply, Score alpha, Score beta, SearchNode* 
                 // reductions = std::max(reductions - isPVNode, 0);
             }
 
-            score =
-                -Search<CutNode>(std::max(depth - reductions + extension - 1, 0), ply + 1, -alpha - 1, -alpha, &child);
+            score = -Search<NonPVNode>(std::max(depth - reductions + extension - 1, 0), ply + 1, -alpha - 1, -alpha,
+                                     &child, true, !cutNode);
 
             if (score > alpha)
             {
@@ -631,13 +633,13 @@ Score Searcher::Search(int depth, int ply, Score alpha, Score beta, SearchNode* 
         // do a full search cutnode search if alpha was exceeded
         if (fullSearch && !(isPVNode && i == 0))
         {
-            score = -Search<CutNode>(depth + extension - 1, ply + 1, -alpha - 1, -alpha, &child);
+            score = -Search<NonPVNode>(depth + extension - 1, ply + 1, -alpha - 1, -alpha, &child, true, !cutNode);
         }
 
         // on pv nodes, search as a pv node if a full search cut node exceeded alpha
         if (isPVNode && (i == 0 || score > alpha))
         {
-            score = -Search<PVNode>(depth + extension - 1, ply + 1, -beta, -alpha, &child);
+            score = -Search<PVNode>(depth + extension - 1, ply + 1, -beta, -alpha, &child, true);
         }
         Undomove(ply);
 
@@ -897,7 +899,7 @@ void Searcher::ComputeMovetime()
 
     // The hard limit is what an in-progress iteration may not exceed. Never commit more than a
     // fraction of the clock to a single move regardless of what the increment suggests.
-    unsigned long long hard = std::min(remaining * 2 / 5, soft * 5);
+    unsigned long long hard = std::min(remaining / 6, soft * 3);
 
     soft = std::min(soft, hard);
 

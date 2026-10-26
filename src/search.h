@@ -9,7 +9,6 @@
 #include "SearchNode.h"
 #include "board.h"
 #include "move.h"
-#include "movegen.h"
 #include "nnue/accumulatorList.h"
 #include "searchInfo.h"
 #include "transposition.h"
@@ -18,8 +17,8 @@
 enum NodeType
 {
     PVNode,
-    CutNode,
-    RootNode
+    NonPVNode,
+    RootNode,
 };
 
 struct SearchConstraints
@@ -133,7 +132,7 @@ class Searcher
     void IterativeDeepening(Board& board);
 
     template <NodeType nodeT>
-    Score Search(int depth, int ply, Score alpha, Score beta, SearchNode* node, const bool nullMoveAllowed = true);
+    Score Search(int depth, int ply, Score alpha, Score beta, SearchNode* node, const bool nullMoveAllowed = true, bool cutNode = false);
     Score QSearch(int ply, Score alpha, Score beta, SearchNode* node);
 };
 
