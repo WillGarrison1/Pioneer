@@ -77,7 +77,7 @@ void TranspositionTable::SetEntry(Key zobrist, Score staticEval, Score score, in
 
     for (TranspositionEntry& e : bucket->entries)
     {
-        if (!e.isEmpty()) // just fill entry if empty
+        if (e.isEmpty()) // just fill entry if empty
         {
             entry = &e;
             break;

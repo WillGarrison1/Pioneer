@@ -103,7 +103,7 @@ void Engine::SetOption(const std::string& name, const std::string& value)
         }
     }
 
-    std::cout << "info string no option with name " << name;
+    std::cout << "info string no option with name " << name << std::endl;
 }
 
 template <typename OptionType>
